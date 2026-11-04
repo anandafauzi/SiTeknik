@@ -90,3 +90,4 @@ export interface CalculationResult {
   notes: string;
   waMessage: string;
 }
+

@@ -470,3 +470,4 @@ export function saveDb(data: DatabaseSchema): void {
   fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
   fs.renameSync(tempPath, DB_PATH);
 }
+

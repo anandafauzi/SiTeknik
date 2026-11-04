@@ -248,3 +248,4 @@ export default function AdminLayananPage() {
     </div>
   );
 }
+

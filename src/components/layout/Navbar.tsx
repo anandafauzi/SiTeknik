@@ -275,3 +275,4 @@ export default function Navbar({ whatsappNumber = "6281234567890" }: NavbarProps
     </header>
   );
 }
+

@@ -175,3 +175,4 @@ function generateSmartRagReply(query: string, docs: KnowledgeItem[]): string {
   // Default honest fallback
   return `Untuk pertanyaan dengan spesifikasi khusus tersebut, kami perlu mengonfirmasi detail kebutuhan dan kondisi di lapangan terlebih dahulu. Silakan hubungi Admin teknisi kami via WhatsApp agar mendapatkan informasi teknis dan penawaran harga yang lebih akurat.`;
 }
+

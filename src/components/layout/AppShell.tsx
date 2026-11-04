@@ -31,3 +31,4 @@ export default function AppShell({ children, settings }: AppShellProps) {
     </>
   );
 }
+

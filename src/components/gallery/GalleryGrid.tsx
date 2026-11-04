@@ -225,3 +225,4 @@ export default function GalleryGrid({ initialItems }: GalleryGridProps) {
     </div>
   );
 }
+
