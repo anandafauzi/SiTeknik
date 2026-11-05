@@ -52,16 +52,15 @@ Website ini dibangun menggunakan arsitektur modern full-stack **Next.js 14 (App 
 - Format pesan pesanan otomatis terisi: Nama, Kategori Layanan, Detail Pekerjaan, Lokasi, Estimasi Biaya, dan Catatan Tambahan.
 - Nomor WhatsApp admin dapat diubah sewaktu-waktu melalui dashboard admin tanpa mengubah kode program.
 
-### 6. Dashboard Admin Lengkap & Aman (`/admin`)
-- Dilindungi autentikasi login sesi JWT (`/admin/login`).
-  - **Username Default**: `admin`
-  - **Password Default**: `admin123`
+### 6. Dashboard Admin Lengkap & Aman (`/portal-admin`)
+- Akses login privat melalui URL `/portal-admin` terlindungi sesi JWT `httpOnly` 7 hari dan proteksi Next.js Middleware.
+- **Database Cloud Supabase PostgreSQL**: Data layanan, harga, galeri, garansi, chatbot RAG, dan pengaturan tersimpan permanen di cloud dengan sinkronisasi instan.
 - **Manajemen Layanan**: Ubah judul, deskripsi, foto, cakupan pekerjaan, SOP, dan harga awal.
 - **Manajemen Harga**: Tambah/edit/hapus tarif jasa, satuan kerja, dan parameter kalkulator.
-- **Manajemen Galeri**: Unggah foto baru, tentukan lokasi di Tangsel, tanggal pengerjaan, dan foto before/after.
+- **Manajemen Galeri**: Tambah foto baru, tentukan lokasi di Tangsel, tanggal pengerjaan, dan foto before/after.
 - **Manajemen Garansi**: Atur durasi garansi, butir cakupan, syarat klaim, dan pengecualian.
 - **Manajemen Chatbot & RAG**: Tambah/edit/hapus dokumen pengetahuan, FAQ, pesan sapaan, daftar quick questions, dan pengaturan Gemini API Key.
-- **Pengaturan Website**: Ubah nama bisnis, tagline, nomor WhatsApp, alamat kantor di Tangsel, dan daftar kecamatan yang dilayani.
+- **Pengaturan Website & Akun**: Ubah nomor WhatsApp, alamat kantor, daftar jangkauan wilayah, serta ubah username dan password admin secara aman.
 
 ### 7. Optimasi SEO & Schema LocalBusiness
 - Meta tags terstruktur (Title, Description, OpenGraph, Twitter Card).

@@ -146,12 +146,25 @@ alter table site_settings enable row level security;
 alter table admin_users enable row level security;
 
 -- Public read policies (anon can read public data)
+drop policy if exists "public_read_services" on services;
 create policy "public_read_services" on services for select using (true);
+
+drop policy if exists "public_read_pricing" on pricing;
 create policy "public_read_pricing" on pricing for select using (true);
+
+drop policy if exists "public_read_gallery" on gallery;
 create policy "public_read_gallery" on gallery for select using (true);
+
+drop policy if exists "public_read_warranties" on warranties;
 create policy "public_read_warranties" on warranties for select using (true);
+
+drop policy if exists "public_read_knowledge" on knowledge;
 create policy "public_read_knowledge" on knowledge for select using (true);
+
+drop policy if exists "public_read_chatbot_config" on chatbot_config;
 create policy "public_read_chatbot_config" on chatbot_config for select using (true);
+
+drop policy if exists "public_read_site_settings" on site_settings;
 create policy "public_read_site_settings" on site_settings for select using (true);
 
 -- Admin writes use service_role key (bypasses RLS entirely)
