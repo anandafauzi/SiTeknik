@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { refreshDbFromSupabase } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category");
 

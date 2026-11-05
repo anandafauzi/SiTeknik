@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { refreshDbFromSupabase } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export async function GET() {
   const user = getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
   return NextResponse.json({
     servicesCount: db.services.length,
     pricingCount: db.pricing.length,
@@ -19,4 +19,3 @@ export async function GET() {
     businessName: db.settings.businessName,
   });
 }
-

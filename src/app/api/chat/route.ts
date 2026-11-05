@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { refreshDbFromSupabase } from "@/lib/db";
 import { askBusinessChatbot } from "@/lib/rag";
 import { generateBookingWaUrl } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
   return NextResponse.json({
     config: db.chatbotConfig,
     settings: {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { reply, relevantDocs, isAiGenerated } = await askBusinessChatbot(message, history || []);
 
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
     const waUrl = generateBookingWaUrl({
       serviceCategory: "Konsultasi Layanan via Chatbot",
       jobDetails: `Pertanyaan Pelanggan: "${message}"`,
@@ -35,12 +35,7 @@ export async function POST(req: NextRequest) {
       chatbotSummary: reply.length > 250 ? reply.slice(0, 250) + "..." : reply,
     });
 
-    return NextResponse.json({
-      reply,
-      relevantDocs,
-      isAiGenerated,
-      waUrl,
-    });
+    return NextResponse.json({ reply, relevantDocs, isAiGenerated, waUrl });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Failed to process chat" }, { status: 500 });
   }

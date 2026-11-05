@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db";
+import { refreshDbFromSupabase, saveDb, saveSettingsToSupabase, saveAdminUserToSupabase } from "@/lib/db";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { SiteSettings } from "@/lib/types";
 
@@ -9,7 +9,7 @@ export async function GET() {
   const user = getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
   return NextResponse.json({
     settings: db.settings,
     adminUsername: db.adminUsers[0]?.username || "admin",
@@ -22,9 +22,9 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body: Partial<SiteSettings> & { newPassword?: string; newUsername?: string } = await req.json();
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
 
-    // Handle password change if provided
+    // Handle password change
     if (body.newPassword && body.newPassword.trim() !== "") {
       const newHash = await hashPassword(body.newPassword.trim());
       if (db.adminUsers.length > 0) {
@@ -32,17 +32,19 @@ export async function PUT(req: NextRequest) {
         if (body.newUsername && body.newUsername.trim() !== "") {
           db.adminUsers[0].username = body.newUsername.trim();
         }
+        await saveAdminUserToSupabase(db.adminUsers[0]);
       }
     } else if (body.newUsername && body.newUsername.trim() !== "") {
       if (db.adminUsers.length > 0) {
         db.adminUsers[0].username = body.newUsername.trim();
+        await saveAdminUserToSupabase(db.adminUsers[0]);
       }
     }
 
-    // Remove password keys from settings object
     const { newPassword, newUsername, ...settingsData } = body;
     db.settings = { ...db.settings, ...settingsData };
-    saveDb(db);
+    await saveSettingsToSupabase(db.settings);
+    saveDb(db); // update local cache
 
     return NextResponse.json({
       success: true,
@@ -53,4 +55,3 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
-

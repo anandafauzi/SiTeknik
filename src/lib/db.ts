@@ -1,3 +1,13 @@
+/**
+ * db.ts — SiTeknik Database Layer
+ *
+ * Priority:
+ *  1. Supabase (if SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY is set)
+ *  2. Local JSON file (dev) → /tmp JSON (Vercel serverless fallback)
+ *
+ * All public exports keep the same interface as before so no other files need changing.
+ */
+
 import fs from "fs";
 import path from "path";
 import {
@@ -9,7 +19,11 @@ import {
   ChatbotConfig,
   SiteSettings,
 } from "./types";
+import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema
+// ─────────────────────────────────────────────────────────────────────────────
 export interface DatabaseSchema {
   services: ServiceItem[];
   pricing: PricingItem[];
@@ -21,367 +35,285 @@ export interface DatabaseSchema {
   adminUsers: { id: string; username: string; passwordHash: string; name: string }[];
 }
 
-const DB_PATH = path.join(process.cwd(), "data", "siteknik_db.json");
+// ─────────────────────────────────────────────────────────────────────────────
+// Supabase row → app type mappers
+// ─────────────────────────────────────────────────────────────────────────────
+function mapService(row: Record<string, unknown>): ServiceItem {
+  return {
+    id: row.id as string,
+    slug: row.slug as string,
+    title: row.title as string,
+    category: row.category as ServiceItem["category"],
+    shortDescription: row.short_description as string,
+    fullDescription: row.full_description as string,
+    icon: row.icon as string,
+    image: row.image as string,
+    features: (row.features as string[]) || [],
+    jobTypes: (row.job_types as string[]) || [],
+    processSteps: (row.process_steps as ServiceItem["processSteps"]) || [],
+    warrantyInfo: row.warranty_info as string,
+    estimatedTime: row.estimated_time as string,
+    startingPrice: row.starting_price as number,
+  };
+}
 
-const defaultServices: ServiceItem[] = [
-  {
-    id: "srv-listrik",
-    slug: "listrik",
-    title: "Jasa Instalasi Listrik Bergaransi",
-    category: "listrik",
-    shortDescription: "Instalasi listrik baru, penambahan titik lampu, stop kontak, panel MCB, dan perbaikan gangguan korsleting berstandar SNI & bergaransi.",
-    fullDescription: "Layanan jasa instalasi dan perbaikan listrik profesional untuk rumah tinggal, ruko, kantor, dan bangunan di Tangerang Selatan. Dikerjakan oleh teknisi bersertifikat dengan standar keselamatan kerja ketat (K3), penggunaan material berkualitas standar SNI, serta jaminan garansi pekerjaan untuk kenyamanan dan keamanan hunian Anda.",
-    icon: "Zap",
-    image: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=1200&auto=format&fit=crop",
-    features: [
-      "Teknisi listrik berpengalaman & bersertifikat",
-      "Pengerjaan rapi mengacu standar SNI & PUIL",
-      "Pemeriksaan beban listrik menyeluruh",
-      "Garansi pekerjaan hingga 90 hari",
-      "Peralatan pengujian digital modern",
-      "Konsultasi & estimasi biaya transparan",
-    ],
-    jobTypes: [
-      "Instalasi listrik rumah baru & renovasi",
-      "Penambahan titik lampu (inbow / outbow / downlight)",
-      "Penambahan stop kontak & saklar",
-      "Perbaikan instalasi listrik & pelacakan korsleting",
-      "Penggantian kabel listrik aus / lapuk standar SNI",
-      "Pemasangan MCB, ELCB/RCBO, dan Box Panel Listrik",
-      "Pemeriksaan dan perbaikan gangguan lonjakan listrik",
-      "Instalasi grounding / arde penangkal petir",
-    ],
-    processSteps: [
-      { step: 1, title: "Konsultasi & Jadwal", description: "Sampaikan kebutuhan dan lokasi di Tangerang Selatan via WhatsApp untuk estimasi awal dan jadwal survei/eksekusi." },
-      { step: 2, title: "Pemeriksaan Lapangan", description: "Teknisi melakukan inspeksi fisik jalur kelistrikan, pengukuran beban, dan konfirmasi rincian pekerjaan serta material." },
-      { step: 3, title: "Pengerjaan Sesuai SOP", description: "Instalasi atau perbaikan dikerjakan dengan mematikan arus utama sementara dan mengutamakan keselamatan kerja (K3)." },
-      { step: 4, title: "Pengujian & Sertifikasi Garansi", description: "Pengujian fungsionalitas dan beban listrik, pembersihan area kerja, dan penerbitan nota bergaransi resmi." },
-    ],
-    warrantyInfo: "Garansi instalasi listrik 30 hingga 90 hari tergantung jenis pekerjaan. Meliputi perbaikan ulang gratis jika terjadi kendala pada sambungan atau titik yang dikerjakan.",
-    estimatedTime: "2 - 6 jam tergantung jumlah titik dan kompleksitas jalur kabel.",
-    startingPrice: 65000,
-  },
-  {
-    id: "srv-ac",
-    slug: "ac",
-    title: "Jasa Instalasi dan Cuci AC",
-    category: "ac",
-    shortDescription: "Cuci AC menyeluruh, pemasangan unit AC baru/bekas, bongkar pasang, tambah/isi freon, dan perbaikan AC tidak dingin atau bocor air.",
-    fullDescription: "Solusi lengkap perawatan dan pemasangan pendingin ruangan (AC Split 0.5 PK s/d 2.5 PK, Inverter & Non-Inverter) di seluruh kawasan Tangerang Selatan. Menggunakan peralatan cuci bertekanan tinggi dengan pelindung terpal rapi tanpa mengotori dinding/lantai, pengerjaan vakum wajib saat instalasi, serta teknisi yang ramah dan teliti.",
-    icon: "Wind",
-    image: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?q=80&w=1200&auto=format&fit=crop",
-    features: [
-      "Pembersihan indoor & outdoor unit menyeluruh",
-      "Vakum pipa wajib saat pasang AC baru",
-      "Peralatan cuci bersih dengan cover pelindung dinding",
-      "Pengecekan tekanan freon & arus ampere",
-      "Garansi cuci AC (kebocoran/kurang dingin) 30 hari",
-      "Melayani AC Split standar, inverter, hingga kaset/standing",
-    ],
-    jobTypes: [
-      "Cuci AC berkala (0.5 PK - 1 PK)",
-      "Cuci AC berkala (1.5 PK - 2 PK)",
-      "Pemasangan unit AC baru / bekas",
-      "Bongkar pasang unit AC relokasi",
-      "Pemeriksaan AC tidak dingin / berisik",
-      "Pemeriksaan & perbaikan kebocoran air indoor",
-      "Pengisian / penambahan freon R32, R410A, R22",
-      "Pergantian kapasitor, sensor suhu, atau modul PCB",
-    ],
-    processSteps: [
-      { step: 1, title: "Pemesanan & Diagnosa", description: "Pilih layanan AC (cuci/pasang/perbaikan) dan pilih kapasitas unit PK Anda." },
-      { step: 2, title: "Pemasangan Proteksi", description: "Teknisi memasang plastik cover pelindung dinding & perabotan agar lantai dan tembok tetap bersih." },
-      { step: 3, title: "Pembersihan / Instalasi", description: "Penyemprotan evaporator, blower, filter, dan kondensor outdoor dengan water jet bertekanan pas." },
-      { step: 4, title: "Tes Suhu & Tekanan", description: "Pengukuran hembusan udara dingin, cek arus listrik, dan perapian selang drainase." },
-    ],
-    warrantyInfo: "Garansi cuci AC 30 hari terhadap keluhan tetesan air (bocor indoor) dan garansi instalasi pipa 30 hari.",
-    estimatedTime: "Cuci AC 45-60 menit/unit. Instalasi baru 2-3 jam.",
-    startingPrice: 75000,
-  },
-  {
-    id: "srv-bor-sumur",
-    slug: "bor-sumur",
-    title: "Jasa Pengeboran Sumur Tangsel",
-    category: "bor-sumur",
-    shortDescription: "Pembuatan sumur bor jet pump & submersible kedalaman 20 - 60+ meter, instalasi pompa air, torn, dan perbaikan sumur kering atau keruh.",
-    fullDescription: "Penyedia jasa bor sumur air bersih terpercaya untuk rumah tinggal dan komersial di Tangerang Selatan. Kami sangat memahami karakteristik lapisan geologi tanah Tangsel (mulai dari lapisan tanah merah Ciputat-Pamulang hingga lapisan pasir berbatu Serpong-BSD). Kami menjamin perolehan sumber mata air jernih, bebas bau, bebas minyak/zat besi tinggi, dengan pipa casing berkualitas tebal (AW).",
-    icon: "Drill",
-    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1200&auto=format&fit=crop",
-    features: [
-      "Peralatan mesin bor hidrolik & manual sesuai akses lokasi",
-      "Paham karakteristik lapisan tanah Tangerang Selatan",
-      "Pipa casing tebal standar AW tahan tekanan tanah",
-      "Garansi debit air & kejernihan air (syarat ketentuan)",
-      "Pilihan paket komplit (pengeboran + pompa + pemasangan)",
-      "Solusi untuk air bau besi, keruh, atau sumur kering saat kemarau",
-    ],
-    jobTypes: [
-      "Pengeboran sumur dangkal Jet Pump (20 - 30 meter)",
-      "Pengeboran sumur dalam Submersible (30 - 45 meter)",
-      "Pengeboran sumur industri / komersial (50 - 60+ meter)",
-      "Pemasangan pompa air baru (Jet Pump / Submersible / Booster)",
-      "Instalasi pipa hisap, pipa dorong, dan toren air otomatis",
-      "Servis sumur bor (kuras sumur, ganti pipa jebol, angkat pompa macet)",
-      "Pemasangan filter penjernih air & karbon aktif",
-    ],
-    processSteps: [
-      { step: 1, title: "Survei Titik & Karakteristik Tanah", description: "Penentuan titik bor bebas kontaminasi septictank (jarak aman >10m) dan analisis kedalaman mata air lokal." },
-      { step: 2, title: "Mobilisasi Alat & Pengeboran", description: "Pengeboran dengan mata bor baja hingga menembus lapisan pasir air tawar bersih (akuifer bebas zat besi)." },
-      { step: 3, title: "Pemasangan Casing & Gravel Pack", description: "Pemasangan pipa cashing PVC AW dan batu gravel untuk menyaring pasir halus agar air tetap jernih." },
-      { step: 4, title: "Kuras (Spooling) & Pasang Pompa", description: "Pembersihan sisa lumpur hingga air keluar bening, dilanjutkan instalasi pompa dan tes debit air." },
-    ],
-    warrantyInfo: "Garansi debit air hingga 90 hari dan garansi instalasi pipa sumur selama 6 bulan.",
-    estimatedTime: "1 - 3 hari kerja tergantung kedalaman dan lapisan bebatuan tanah.",
-    startingPrice: 3500000,
-  },
-];
+function mapPricing(row: Record<string, unknown>): PricingItem {
+  return {
+    id: row.id as string,
+    category: row.category as PricingItem["category"],
+    code: row.code as string,
+    name: row.name as string,
+    unit: row.unit as string,
+    basePrice: row.base_price as number,
+    description: row.description as string,
+    isAddon: Boolean(row.is_addon),
+  };
+}
 
-const defaultPricing: PricingItem[] = [
-  // Listrik
-  { id: "prc-el-01", category: "listrik", code: "EL_TITIK_LAMPU", name: "Jasa Pasang Titik Lampu Baru (tanpa bobok/outbow)", unit: "titik", basePrice: 65000, description: "Jasa penarikan kabel dan fitting lampu jalur outbow" },
-  { id: "prc-el-02", category: "listrik", code: "EL_TITIK_LAMPU_BOBOK", name: "Jasa Pasang Titik Lampu Baru (bobok tembok/inbow)", unit: "titik", basePrice: 95000, description: "Penarikan kabel dengan bobok dinding rapi dan plester ulang" },
-  { id: "prc-el-03", category: "listrik", code: "EL_STOP_KONTAK", name: "Jasa Pasang / Tambah Stop Kontak / Saklar", unit: "titik", basePrice: 75000, description: "Pemasangan unit stop kontak baru termasuk sambungan kabel" },
-  { id: "prc-el-04", category: "listrik", code: "EL_KABEL_METER", name: "Kabel Listrik NYM 3x2.5mm SNI (Supreme/Eterna)", unit: "meter", basePrice: 18000, description: "Kabel tembaga tunggal berisolasi tebal standar PLN" },
-  { id: "prc-el-05", category: "listrik", code: "EL_PASANG_MCB", name: "Jasa Penggantian / Pasang MCB Box Panel", unit: "unit", basePrice: 120000, description: "Pemasangan unit MCB baru dan perapian jalur pembagian fasa" },
-  { id: "prc-el-06", category: "listrik", code: "EL_CEK_KORSLET", name: "Jasa Pelacakan & Perbaikan Korsleting Listrik", unit: "titik/kasus", basePrice: 150000, description: "Investigasi jalur kabel korslet dengan multimeter digital" },
-  { id: "prc-el-07", category: "listrik", code: "EL_GROUNDING", name: "Instalasi Grounding / Arde Pengaman", unit: "titik", basePrice: 250000, description: "Penanaman rod tembaga pengaman lonjakan petir dan kebocoran arus", isAddon: true },
+function mapGallery(row: Record<string, unknown>): GalleryItem {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    category: row.category as GalleryItem["category"],
+    imageUrl: row.image_url as string,
+    beforeImageUrl: (row.before_image_url as string) || undefined,
+    afterImageUrl: (row.after_image_url as string) || undefined,
+    jobType: row.job_type as string,
+    location: row.location as string,
+    date: row.date as string,
+    description: row.description as string,
+  };
+}
 
-  // AC
-  { id: "prc-ac-01", category: "ac", code: "AC_CUCI_05_10", name: "Cuci AC Split (0.5 PK - 1 PK)", unit: "unit", basePrice: 75000, description: "Pembersihan total indoor + outdoor, blower, cek tekanan freon" },
-  { id: "prc-ac-02", category: "ac", code: "AC_CUCI_15_20", name: "Cuci AC Split (1.5 PK - 2 PK)", unit: "unit", basePrice: 90000, description: "Pembersihan total kapasitas besar indoor + outdoor" },
-  { id: "prc-ac-03", category: "ac", code: "AC_PASANG_05_10", name: "Jasa Pasang AC Baru/Lama (0.5 PK - 1 PK)", unit: "unit", basePrice: 250000, description: "Termasuk jasa pasang bracket, sambung pipa, dan vakum mesin" },
-  { id: "prc-ac-04", category: "ac", code: "AC_PASANG_15_20", name: "Jasa Pasang AC Baru/Lama (1.5 PK - 2 PK)", unit: "unit", basePrice: 320000, description: "Jasa pasang unit kapasitas besar termasuk proses vakum instalasi" },
-  { id: "prc-ac-05", category: "ac", code: "AC_BONGKAR_PASANG", name: "Bongkar Pasang AC (Relokasi Ruangan/Rumah)", unit: "unit", basePrice: 375000, description: "Pelepasan unit lama, simpan freon (pump down), pasang di lokasi baru" },
-  { id: "prc-ac-06", category: "ac", code: "AC_TAMBAH_FREON_R32", name: "Tambah Freon R32 / R410A (0.5 - 1 PK)", unit: "unit", basePrice: 150000, description: "Penambahan tekanan freon sampai standar dingin optimal" },
-  { id: "prc-ac-07", category: "ac", code: "AC_ISI_FULL_FREON", name: "Isi Ulang Full Freon R32 / R410A (karena bocor habis)", unit: "unit", basePrice: 275000, description: "Pengisian penuh setelah perbaikan titik kebocoran" },
-  { id: "prc-ac-08", category: "ac", code: "AC_PIPA_TEMBAGA", name: "Pipa Tembaga AC Berkualitas (Tateyama / Hoda)", unit: "meter", basePrice: 95000, description: "Pipa tembaga tebal anti korosi & anti bocor per meter", isAddon: true },
+function mapWarranty(row: Record<string, unknown>): WarrantyPolicy {
+  return {
+    id: row.id as string,
+    serviceCategory: row.service_category as WarrantyPolicy["serviceCategory"],
+    title: row.title as string,
+    duration: row.duration as string,
+    coverage: (row.coverage as string[]) || [],
+    claimTerms: (row.claim_terms as string[]) || [],
+    exclusions: (row.exclusions as string[]) || [],
+  };
+}
 
-  // Bor Sumur
-  { id: "prc-sm-01", category: "bor-sumur", code: "SM_BOR_20_30M", name: "Pengeboran Sumur Jet Pump (Kedalaman 20 - 30 Meter)", unit: "paket", basePrice: 3500000, description: "Cocok untuk kawasan air dangkal bersih (pengerjaan bor + pipa casing 4 inch AW)" },
-  { id: "prc-sm-02", category: "bor-sumur", code: "SM_BOR_30_45M", name: "Pengeboran Sumur Dalam Submersible (Kedalaman 30 - 45 Meter)", unit: "paket", basePrice: 6500000, description: "Sumber air lebih jernih dan bebas bau besi (casing pipa PVC 4 inch AW)" },
-  { id: "prc-sm-03", category: "bor-sumur", code: "SM_BOR_50_60M", name: "Pengeboran Sumur Dalam Submersible (Kedalaman 50 - 60+ Meter)", unit: "paket", basePrice: 9500000, description: "Solusi kawasan tanah berbatu / bukit kering di Tangerang Selatan" },
-  { id: "prc-sm-04", category: "bor-sumur", code: "SM_PASANG_POMPA_JET", name: "Jasa Pemasangan Pompa Air Jet Pump", unit: "unit", basePrice: 350000, description: "Pemasangan mata jet, pipa hisap, kabel, dan penyetelan otomatis" },
-  { id: "prc-sm-05", category: "bor-sumur", code: "SM_PASANG_SUBMERSIBLE", name: "Jasa Pemasangan Pompa Celup Submersible", unit: "unit", basePrice: 500000, description: "Pemasangan kabel kedap air, tali pengaman baja, control box, dan pipa dorong" },
-  { id: "prc-sm-06", category: "bor-sumur", code: "SM_PIPA_INSTALASI", name: "Instalasi Jalur Pipa PVC ke Toren / Rumah", unit: "meter", basePrice: 25000, description: "Pipa PVC Rucika AW + sambungan lem kuat", isAddon: true },
-  { id: "prc-sm-07", category: "bor-sumur", code: "SM_KURAS_SUMUR", name: "Jasa Kuras Sumur / Cuci Sumur Bor Macet", unit: "pekerjaan", basePrice: 750000, description: "Pembersihan endapan pasir dan lumpur dasar sumur menggunakan kompresor", isAddon: true },
-];
+function mapKnowledge(row: Record<string, unknown>): KnowledgeItem {
+  return {
+    id: row.id as string,
+    category: row.category as KnowledgeItem["category"],
+    topic: row.topic as string,
+    content: row.content as string,
+    keywords: (row.keywords as string[]) || [],
+  };
+}
 
-const defaultGallery: GalleryItem[] = [
-  {
-    id: "gal-01",
-    title: "Perapian Panel MCB & Instalasi Rumah 2 Lantai",
-    category: "listrik",
-    imageUrl: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=800&auto=format&fit=crop",
-    beforeImageUrl: "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?q=80&w=800&auto=format&fit=crop",
-    afterImageUrl: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=800&auto=format&fit=crop",
-    jobType: "Penggantian Box Panel MCB Schneider & Jalur Grounding",
-    location: "Cluster Foresta, BSD City, Serpong",
-    date: "2026-10-18",
-    description: "Perapian jalur kelistrikan rumah 2 lantai yang sering trip akibat kelebihan beban tidak seimbang. Dilakukan pembagian 4 grup MCB baru dan instalasi ELCB.",
-  },
-  {
-    id: "gal-02",
-    title: "Cuci AC & Servis Kebocoran Indoor Split 1 PK",
-    category: "cuci-ac",
-    imageUrl: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?q=80&w=800&auto=format&fit=crop",
-    jobType: "Cuci AC Berkala + Pembersihan Saluran Drainase",
-    location: "Bintaro Sektor 7, Pondok Aren",
-    date: "2026-10-24",
-    description: "Keluhan AC netes air di kamar utama dan hembusan berbau apak. Dilakukan pembersihan lumut pada talang air dan cuci kompresor outdoor hingga bersih tuntas.",
-  },
-  {
-    id: "gal-03",
-    title: "Pengeboran Sumur Dalam 42 Meter Pompa Submersible",
-    category: "bor-sumur",
-    imageUrl: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=800&auto=format&fit=crop",
-    jobType: "Pembuatan Sumur Bor Baru & Pemasangan Pompa Submersible 0.5 HP",
-    location: "Pamulang Permai 1, Pamulang",
-    date: "2026-10-12",
-    description: "Pembuatan sumur baru di area padat penduduk. Mendapatkan sumber air bersih jernih debit 35 liter/menit pada kedalaman 42 meter tanpa bau dan bebas endapan.",
-  },
-  {
-    id: "gal-04",
-    title: "Pemasangan 12 Titik Lampu Downlight LED & Saklar",
-    category: "listrik",
-    imageUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=800&auto=format&fit=crop",
-    jobType: "Instalasi Titik Lampu Plafon Baru",
-    location: "Perumahan Puri Serpong, Setu",
-    date: "2026-10-29",
-    description: "Instalasi titik lampu warm white estetis dengan kabel NYM 3x1.5mm berpipa konduit pelindung plafon untuk keamanan maksimal.",
-  },
-  {
-    id: "gal-05",
-    title: "Instalasi Unit Baru AC Daikin Inverter 1.5 PK",
-    category: "ac",
-    imageUrl: "https://images.unsplash.com/photo-1585338107529-13afc5f02586?q=80&w=800&auto=format&fit=crop",
-    jobType: "Pemasangan AC Baru Lengkap Vakum Mesin",
-    location: "Ciputat Timur, Tangerang Selatan",
-    date: "2026-11-01",
-    description: "Pemasangan AC Inverter baru dengan pipa tembaga tebal 0.7mm, proses pembuangan udara pipa menggunakan pompa vakum 15 menit agar kompresor awet dingin optimal.",
-  },
-  {
-    id: "gal-06",
-    title: "Perbaikan Sumur Keruh & Penggantian Pipa Hisap Jet Pump",
-    category: "bor-sumur",
-    imageUrl: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=800&auto=format&fit=crop",
-    jobType: "Kuras Sumur & Ganti Mata Jet",
-    location: "Pondok Cabe Ilir, Pamulang",
-    date: "2026-10-05",
-    description: "Sumur lama usia 7 tahun mengalami hisapan pasir dan air menguning. Dilakukan pencucian sumur (air compressor blow) dan pergantian pipa hisap Rucika AW.",
-  },
-];
+function mapSettings(row: Record<string, unknown>): SiteSettings {
+  return {
+    businessName: row.business_name as string,
+    tagline: row.tagline as string,
+    whatsappNumber: row.whatsapp_number as string,
+    phoneDisplay: row.phone_display as string,
+    email: row.email as string,
+    address: row.address as string,
+    city: row.city as string,
+    operatingHours: row.operating_hours as string,
+    heroHeadline: row.hero_headline as string,
+    heroSubheadline: row.hero_subheadline as string,
+    serviceAreas: (row.service_areas as string[]) || [],
+    geminiApiKey: (row.gemini_api_key as string) || "",
+  };
+}
 
-const defaultWarranties: WarrantyPolicy[] = [
-  {
-    id: "war-listrik",
-    serviceCategory: "listrik",
-    title: "Ketentuan Garansi Instalasi Listrik",
-    duration: "30 hingga 90 Hari Kalender",
-    coverage: [
-      "Kerapian dan kekuatan sambungan kabel pada titik lampu/saklar/stop kontak baru.",
-      "Kinerja fungsional MCB dan box panel yang dipasang oleh teknisi kami.",
-      "Koreksi bebas biaya jika titik yang dikerjakan mengalami putus kontak atau longgar.",
-    ],
-    claimTerms: [
-      "Menunjukkan bukti foto/invoice digital pemesanan via WhatsApp SiTeknik.",
-      "Klaim dilaporkan dalam kurun waktu masa aktif garansi.",
-      "Teknisi akan dikirimkan maksimal 1x24 jam setelah laporan klaim diterima.",
-    ],
-    exclusions: [
-      "Gangguan yang diakibatkan oleh korsleting dari perangkat elektronik eksternal pelanggan yang rusak.",
-      "Sambungan kabel yang telah dibongkar atau diubah sendiri oleh pihak lain tanpa persetujuan SiTeknik.",
-      "Bencana alam, sambaran petir langsung, atau banjir yang merendam instalasi.",
-    ],
-  },
-  {
-    id: "war-ac",
-    serviceCategory: "ac",
-    title: "Ketentuan Garansi Servis & Cuci AC",
-    duration: "30 Hari Kalender",
-    coverage: [
-      "Bocor air (netes) pada unit indoor setelah pencucian atau relokasi.",
-      "Kekencangan sambungan nepel pipa freon dari kebocoran yang dipasang teknisi.",
-      "Kinerja fungsi hembusan pendinginan pasca pemasangan unit.",
-    ],
-    claimTerms: [
-      "Melampirkan nomor handphone yang terdaftar saat pemesanan.",
-      "Garansi berlaku untuk unit AC yang sama yang tercatat di nota pekerjaan.",
-    ],
-    exclusions: [
-      "Kerusakan kompresor aus akibat usia pemakaian unit yang sudah lebih dari 7 tahun.",
-      "Kebocoran pada pipa lama yang tidak diganti dan sudah lapuk/korosi sebelumnya.",
-      "Tegangan listrik rumah pelanggan yang tidak stabil (drop di bawah 190V) yang merusak PCB.",
-    ],
-  },
-  {
-    id: "war-bor",
-    serviceCategory: "bor-sumur",
-    title: "Ketentuan Garansi Pengeboran Sumur",
-    duration: "Garansi Debit Air 90 Hari & Garansi Instalasi 6 Bulan",
-    coverage: [
-      "Jaminan ketersediaan debit sumber air tawar bersih pada kedalaman yang disepakati.",
-      "Kekuatan instalasi pipa casing dari risiko amblas atau pecah sambungan pipa dorong.",
-      "Garansi instalasi pompa air tidak bocor pada drat sambungan.",
-    ],
-    claimTerms: [
-      "Pengujian debit air dilakukan bersama pelanggan saat serah terima pekerjaan.",
-      "Jika terjadi penurunan debit drastis dalam masa garansi, kami lakukan pengeboran ulang atau pendalaman tanpa biaya jasa tambahan.",
-    ],
-    exclusions: [
-      "Kekeringan ekstrem skala regional yang menurunkan permukaan air tanah secara luas.",
-      "Kerusakan mesin pompa akibat pemakaian saat tidak ada aliran air (dry run) oleh pengguna.",
-      "Penurunan kualitas air akibat pencemaran limbah lingkungan eksternal di kemudian hari.",
-    ],
-  },
-];
+// ─────────────────────────────────────────────────────────────────────────────
+// Supabase read — loads full DatabaseSchema
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadFromSupabase(): Promise<DatabaseSchema | null> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return null;
 
-const defaultKnowledge: KnowledgeItem[] = [
-  {
-    id: "kn-01",
-    category: "wilayah",
-    topic: "Wilayah Pelayanan SiTeknik",
-    content: "SiTeknik melayani seluruh wilayah Kota Tangerang Selatan dan area perbatasan sekitarnya, meliputi: Kecamatan Ciputat, Ciputat Timur, Pamulang, Pondok Aren, Serpong, Serpong Utara, Setu, kawasan Bintaro Jaya (Sektor 1 s/d 9), BSD City, Alam Sutera, dan Pondok Cabe. Layanan panggilan dapat datang ke rumah tinggal, ruko, kantor, maupun kos-kosan.",
-    keywords: ["wilayah", "area", "lokasi", "tangsel", "tangerang selatan", "ciputat", "pamulang", "bsd", "bintaro", "serpong", "setu", "pondok aren", "pondok cabe"],
-  },
-  {
-    id: "kn-02",
-    category: "ac",
-    topic: "Harga Cuci AC dan Jenis Kapasitas PK",
-    content: "Biaya jasa cuci AC SiTeknik adalah Rp75.000 per unit untuk AC kapasitas 0.5 PK hingga 1 PK, dan Rp90.000 per unit untuk AC kapasitas 1.5 PK hingga 2 PK. Layanan cuci mencakup pencucian indoor, evaporator, talang air, blower, filter udara, dan kondensor outdoor dengan water jet bertekanan.",
-    keywords: ["harga cuci ac", "biaya cuci ac", "cuci ac 1 pk", "cuci ac 0.5 pk", "cuci ac 2 pk", "tarif cuci ac"],
-  },
-  {
-    id: "kn-03",
-    category: "ac",
-    topic: "Pemasangan dan Bongkar Pasang AC",
-    content: "Jasa pasang AC baru/lama kapasitas 0.5 PK - 1 PK adalah Rp250.000, sedangkan untuk 1.5 PK - 2 PK adalah Rp320.000. Jasa bongkar pasang (relokasi) adalah Rp375.000 per unit. Proses pasang sudah termasuk proses vakum mesin pipa wajib agar sistem pendingin bersih dari uap udara dan dingin maksimal.",
-    keywords: ["pasang ac", "bongkar pasang ac", "biaya pasang ac", "relokasi ac", "pasang ac baru", "tarif pasang ac"],
-  },
-  {
-    id: "kn-04",
-    category: "ac",
-    topic: "AC Tidak Dingin Penyebab dan Solusi",
-    content: "AC yang tidak dingin umumnya dapat disebabkan oleh beberapa kemungkinan: 1) Filter atau evaporator tertutup debu tebal sehingga perlu dicuci; 2) Tekanan freon berkurang akibat adanya kebocoran nepel/pipa; 3) Kerusakan komponen kapasitor atau kompresor tidak berputar; 4) Beban ruangan terlalu besar dibanding kapasitas PK AC. Teknisi SiTeknik dapat melakukan diagnosa menyeluruh di lokasi.",
-    keywords: ["ac tidak dingin", "ac kurang dingin", "kenapa ac tidak dingin", "ac bau", "penyebab ac tidak dingin"],
-  },
-  {
-    id: "kn-05",
-    category: "listrik",
-    topic: "Daftar Harga Jasa Instalasi Listrik",
-    content: "Harga jasa pasang titik lampu baru tanpa bobok (outbow) adalah Rp65.000 per titik. Jika dengan bobokan tembok (inbow) adalah Rp95.000 per titik. Jasa tambah stop kontak / saklar Rp75.000 per titik. Kabel listrik standar SNI NYM 3x2.5mm Rp18.000 per meter. Penggantian MCB box panel Rp120.000. Pelacakan korsleting listrik mulai Rp150.000.",
-    keywords: ["harga listrik", "biaya pasang stop kontak", "biaya pasang lampu", "korsleting", "biaya ganti mcb", "tarif teknisi listrik"],
-  },
-  {
-    id: "kn-06",
-    category: "listrik",
-    topic: "Garansi Pekerjaan Instalasi Listrik",
-    content: "Setiap pekerjaan instalasi listrik di SiTeknik dilengkapi garansi resmi selama 30 hingga 90 hari kalender tergantung jenis pekerjaan. Meliputi perbaikan ulang gratis jika terdapat sambungan kendur atau kendala pada komponen yang kami pasang.",
-    keywords: ["garansi listrik", "apakah bergaransi", "berapa lama garansi listrik", "klaim garansi"],
-  },
-  {
-    id: "kn-07",
-    category: "bor-sumur",
-    topic: "Pengeboran Sumur dan Estimasi Biaya",
-    content: "Biaya pengeboran sumur SiTeknik: 1) Sumur dangkal Jet Pump (20-30 meter) mulai dari Rp3.500.000; 2) Sumur dalam Submersible (30-45 meter) mulai dari Rp6.500.000; 3) Sumur dalam kawasan berbatu (50-60+ meter) mulai dari Rp9.500.000. Paket sudah termasuk pipa casing 4 inch tipe AW berkualitas tinggi. Pompa air dan pipa instalasi rumah dapat dihitung terpisah atau paket komplit.",
-    keywords: ["biaya bor sumur", "harga bor sumur", "sumur jet pump", "sumur submersible", "bor sumur pamulang", "bor sumur bsd", "bor sumur ciputat"],
-  },
-  {
-    id: "kn-08",
-    category: "bor-sumur",
-    topic: "Kondisi Tanah Tangerang Selatan & Kebutuhan Sumur",
-    content: "Di kawasan Tangerang Selatan seperti Pamulang, Ciputat, dan Pondok Aren umumnya memiliki lapisan tanah lempung merah, dengan kedalaman mata air bersih berkisar 24 - 36 meter. Sedangkan area Serpong, BSD, dan Setu cenderung memiliki lapisan pasir berbatu sehingga membutuhkan kedalaman 35 - 50 meter dengan pompa submersible agar air tidak bau besi dan tidak kuning.",
-    keywords: ["tanah tangsel", "kedalaman sumur tangsel", "air bau besi", "air kuning", "sumur submersible vs jet pump"],
-  },
-  {
-    id: "kn-09",
-    category: "umum",
-    topic: "Cara Pemesanan dan Konsultasi Teknisi",
-    content: "Pemesanan layanan SiTeknik sangat mudah: pilih layanan atau gunakan kalkulator estimasi di website, lalu tekan tombol 'Pesan via WhatsApp' untuk terhubung langsung dengan Admin. Anda juga bisa berdiskusi mengenai jadwal kedatangan teknisi, perkiraan biaya, dan konsultasi masalah teknis rumah Anda.",
-    keywords: ["cara pesan", "cara booking", "nomor wa", "whatsapp", "kontak", "hubungi"],
-  },
-  {
-    id: "kn-10",
-    category: "umum",
-    topic: "Persiapan Pelanggan Sebelum Teknisi Datang",
-    content: "Sebelum teknisi datang ke lokasi Anda: 1) Pastikan akses menuju titik kerja (plafon, panel listrik, unit AC, atau lokasi bor sumur) tidak terhalang barang berat; 2) Sediakan sumber air dan colokan listrik jika memerlukan pengetesan alat; 3) Pastikan ada orang dewasa yang mendampingi di rumah; 4) Amankan hewan peliharaan.",
-    keywords: ["persiapan", "sebelum teknisi datang", "tips", "panduan"],
-  },
-];
+  try {
+    const [
+      { data: services },
+      { data: pricing },
+      { data: gallery },
+      { data: warranties },
+      { data: knowledge },
+      { data: chatbotRows },
+      { data: settingsRows },
+      { data: adminUsers },
+    ] = await Promise.all([
+      sb.from("services").select("*").order("created_at"),
+      sb.from("pricing").select("*").order("category").order("created_at"),
+      sb.from("gallery").select("*").order("date", { ascending: false }),
+      sb.from("warranties").select("*"),
+      sb.from("knowledge").select("*").order("created_at"),
+      sb.from("chatbot_config").select("*").eq("id", 1).single(),
+      sb.from("site_settings").select("*").eq("id", 1).single(),
+      sb.from("admin_users").select("id, username, password_hash, name"),
+    ]);
 
-const defaultChatbotConfig: ChatbotConfig = {
-  greeting: "Halo! Saya Asisten Virtual SiTeknik. Ada yang bisa saya bantu terkait jasa instalasi listrik, AC, atau bor sumur di Tangerang Selatan?",
-  quickQuestions: [
-    "Berapa harga cuci AC 1 PK?",
-    "Apakah instalasi listrik bergaransi?",
-    "Berapa estimasi biaya bor sumur 30 meter?",
-    "Area mana saja di Tangsel yang dijangkau?",
-    "AC saya tidak dingin, apa penyebabnya?",
-  ],
-  disclaimer: "Informasi harga dan layanan mengacu pada database resmi SiTeknik. Untuk kepastian kondisi lapangan dan pemesanan, silakan lanjutkan via WhatsApp Admin.",
-  fallbackMessage: "Untuk pertanyaan dengan spesifikasi khusus tersebut, saya sarankan untuk mengonfirmasi langsung dengan Admin teknisi kami agar mendapatkan pengecekan yang lebih akurat. Apakah Anda ingin saya hubungkan ke WhatsApp Admin?",
-};
+    if (!settingsRows || !chatbotRows) return null; // essential tables missing
 
-const defaultSettings: SiteSettings = {
+    const chatbot = chatbotRows as Record<string, unknown>;
+    const settingsRow = settingsRows as Record<string, unknown>;
+
+    return {
+      services: (services || []).map((r) => mapService(r as Record<string, unknown>)),
+      pricing: (pricing || []).map((r) => mapPricing(r as Record<string, unknown>)),
+      gallery: (gallery || []).map((r) => mapGallery(r as Record<string, unknown>)),
+      warranties: (warranties || []).map((r) => mapWarranty(r as Record<string, unknown>)),
+      knowledge: (knowledge || []).map((r) => mapKnowledge(r as Record<string, unknown>)),
+      chatbotConfig: {
+        greeting: chatbot.greeting as string,
+        quickQuestions: (chatbot.quick_questions as string[]) || [],
+        disclaimer: chatbot.disclaimer as string,
+        fallbackMessage: chatbot.fallback_message as string,
+      },
+      settings: mapSettings(settingsRow),
+      adminUsers: (adminUsers || []).map((u: Record<string, unknown>) => ({
+        id: u.id as string,
+        username: u.username as string,
+        passwordHash: u.password_hash as string,
+        name: u.name as string,
+      })),
+    };
+  } catch (err) {
+    console.warn("[db] Supabase load error, falling back to file:", err);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Supabase write helpers
+// ─────────────────────────────────────────────────────────────────────────────
+async function saveSettingsToSupabase(settings: SiteSettings): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  await sb.from("site_settings").upsert({
+    id: 1,
+    business_name: settings.businessName,
+    tagline: settings.tagline,
+    whatsapp_number: settings.whatsappNumber,
+    phone_display: settings.phoneDisplay,
+    email: settings.email,
+    address: settings.address,
+    city: settings.city,
+    operating_hours: settings.operatingHours,
+    hero_headline: settings.heroHeadline,
+    hero_subheadline: settings.heroSubheadline,
+    service_areas: settings.serviceAreas,
+    gemini_api_key: settings.geminiApiKey || "",
+  });
+}
+
+async function saveAdminUserToSupabase(user: { id: string; username: string; passwordHash: string; name: string }): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  await sb.from("admin_users").upsert({
+    id: user.id,
+    username: user.username,
+    password_hash: user.passwordHash,
+    name: user.name,
+  });
+}
+
+async function saveServicesToSupabase(services: ServiceItem[]): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  for (const s of services) {
+    await sb.from("services").upsert({
+      id: s.id, slug: s.slug, title: s.title, category: s.category,
+      short_description: s.shortDescription, full_description: s.fullDescription,
+      icon: s.icon, image: s.image, features: s.features, job_types: s.jobTypes,
+      process_steps: s.processSteps, warranty_info: s.warrantyInfo,
+      estimated_time: s.estimatedTime, starting_price: s.startingPrice,
+      updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+async function savePricingToSupabase(pricing: PricingItem[]): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  for (const p of pricing) {
+    await sb.from("pricing").upsert({
+      id: p.id, category: p.category, code: p.code, name: p.name,
+      unit: p.unit, base_price: p.basePrice, description: p.description,
+      is_addon: p.isAddon || false, updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+async function saveGalleryToSupabase(gallery: GalleryItem[]): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  for (const g of gallery) {
+    await sb.from("gallery").upsert({
+      id: g.id, title: g.title, category: g.category, image_url: g.imageUrl,
+      before_image_url: g.beforeImageUrl || null, after_image_url: g.afterImageUrl || null,
+      job_type: g.jobType, location: g.location, date: g.date, description: g.description,
+      updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+async function saveGalleryDeleteToSupabase(id: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  await sb.from("gallery").delete().eq("id", id);
+}
+
+async function saveKnowledgeToSupabase(knowledge: KnowledgeItem[]): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  for (const k of knowledge) {
+    await sb.from("knowledge").upsert({
+      id: k.id, category: k.category, topic: k.topic, content: k.content,
+      keywords: k.keywords, updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+async function savePricingDeleteToSupabase(id: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  await sb.from("pricing").delete().eq("id", id);
+}
+
+async function saveKnowledgeDeleteToSupabase(id: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  await sb.from("knowledge").delete().eq("id", id);
+}
+
+async function saveWarrantiesToSupabase(warranties: WarrantyPolicy[]): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  for (const w of warranties) {
+    await sb.from("warranties").upsert({
+      id: w.id, service_category: w.serviceCategory, title: w.title,
+      duration: w.duration, coverage: w.coverage, claim_terms: w.claimTerms,
+      exclusions: w.exclusions, updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+async function saveChatbotConfigToSupabase(config: ChatbotConfig): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  await sb.from("chatbot_config").upsert({
+    id: 1,
+    greeting: config.greeting,
+    quick_questions: config.quickQuestions,
+    disclaimer: config.disclaimer,
+    fallback_message: config.fallbackMessage,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Local JSON File Fallback (dev + Vercel /tmp)
+// ─────────────────────────────────────────────────────────────────────────────
+const DEFAULT_SETTINGS: SiteSettings = {
   businessName: "SiTeknik Tangerang Selatan",
   tagline: "Solusi Instalasi & Perawatan Rumah Aman, Profesional, dan Bergaransi",
   whatsappNumber: "6281234567890",
@@ -392,118 +324,135 @@ const defaultSettings: SiteSettings = {
   operatingHours: "Senin - Minggu: 07.30 - 20.00 WIB (Layanan Darurat Siaga)",
   heroHeadline: "Solusi Instalasi dan Perawatan Rumah yang Aman, Profesional, dan Bergaransi.",
   heroSubheadline: "Melayani instalasi listrik, pemasangan dan perawatan AC, serta pengeboran sumur untuk kebutuhan rumah dan bangunan di Tangerang Selatan dan sekitarnya.",
-  serviceAreas: [
-    "Ciputat",
-    "Ciputat Timur",
-    "Pamulang",
-    "Pondok Aren",
-    "Serpong",
-    "Serpong Utara",
-    "Setu",
-    "Pondok Cabe",
-    "Bintaro",
-    "BSD City",
-  ],
+  serviceAreas: ["Ciputat","Ciputat Timur","Pamulang","Pondok Aren","Serpong","Serpong Utara","Setu","Pondok Cabe","Bintaro","BSD City"],
   geminiApiKey: "",
 };
 
-// Hardcoded default admin: user: admin, pass: admin123 (hashed with bcrypt: $2a$10$wTqS... or check fallback)
-const defaultAdminUsers = [
-  {
-    id: "adm-01",
-    username: "admin",
-    // bcrypt hash of 'admin123'
-    passwordHash: "$2a$10$n4j7tLhF0YQhWvM5Z0vBTeNn5qQo3l3gK0YgK9u7WnL6U2f3C6Qh6",
-    name: "Admin SiTeknik",
-  },
-];
-
-let memoryDb: DatabaseSchema | null = null;
-
 function getDbFilePath(): string {
-  // On Vercel serverless functions, /tmp is the only writable directory
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     return path.join("/tmp", "siteknik_db.json");
   }
   return path.join(process.cwd(), "data", "siteknik_db.json");
 }
 
-function ensureDbFile(): DatabaseSchema {
-  if (memoryDb) {
-    return memoryDb;
+let memoryDb: DatabaseSchema | null = null;
+
+function loadFromFile(): DatabaseSchema | null {
+  if (memoryDb) return memoryDb;
+  const paths = [getDbFilePath(), path.join(process.cwd(), "data", "siteknik_db.json")];
+  for (const p of paths) {
+    try {
+      if (fs.existsSync(p)) {
+        const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+        memoryDb = data;
+        return memoryDb;
+      }
+    } catch {}
   }
-
-  const defaultData: DatabaseSchema = {
-    services: defaultServices,
-    pricing: defaultPricing,
-    gallery: defaultGallery,
-    warranties: defaultWarranties,
-    knowledge: defaultKnowledge,
-    chatbotConfig: defaultChatbotConfig,
-    settings: defaultSettings,
-    adminUsers: defaultAdminUsers,
-  };
-
-  const projectDbPath = path.join(process.cwd(), "data", "siteknik_db.json");
-  const writableDbPath = getDbFilePath();
-
-  // 1. Try reading from writable path (/tmp on Vercel) if already created
-  try {
-    if (fs.existsSync(writableDbPath)) {
-      const content = fs.readFileSync(writableDbPath, "utf-8");
-      memoryDb = JSON.parse(content);
-      return memoryDb!;
-    }
-  } catch (err) {
-    // ignore
-  }
-
-  // 2. Try reading from bundled project file
-  try {
-    if (fs.existsSync(projectDbPath)) {
-      const content = fs.readFileSync(projectDbPath, "utf-8");
-      memoryDb = JSON.parse(content);
-      return memoryDb!;
-    }
-  } catch (err) {
-    // ignore
-  }
-
-  // 3. Fallback to default in-memory schema
-  memoryDb = defaultData;
-
-  // Attempt to write initial file if filesystem permits
-  try {
-    const dir = path.dirname(writableDbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(writableDbPath, JSON.stringify(defaultData, null, 2), "utf-8");
-  } catch (err) {
-    // Read-only environment: keep in memory without throwing
-  }
-
-  return memoryDb;
+  return null;
 }
 
+function saveToFile(data: DatabaseSchema): void {
+  memoryDb = data;
+  const p = getDbFilePath();
+  try {
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const tmp = `${p}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+    fs.renameSync(tmp, p);
+  } catch (err) {
+    console.warn("[db] Could not persist to file:", err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Supabase cache (per process, refreshed each getDb() call when Supabase is on)
+// ─────────────────────────────────────────────────────────────────────────────
+let supabaseCache: DatabaseSchema | null = null;
+let supabaseCacheAt = 0;
+const CACHE_TTL_MS = 5000; // 5 seconds — balance freshness vs. request count
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public API: getDb() — synchronous, returns cached data
+// ─────────────────────────────────────────────────────────────────────────────
 export function getDb(): DatabaseSchema {
-  return ensureDbFile();
+  // If Supabase cache is fresh, use it
+  if (supabaseCache && Date.now() - supabaseCacheAt < CACHE_TTL_MS) {
+    return supabaseCache;
+  }
+
+  // Otherwise fall back to file/memory
+  const fileData = loadFromFile();
+  if (fileData) return fileData;
+
+  // Ultimate fallback: empty defaults
+  const defaults: DatabaseSchema = {
+    services: [], pricing: [], gallery: [], warranties: [], knowledge: [],
+    chatbotConfig: { greeting: "Halo! Saya Asisten Virtual SiTeknik.", quickQuestions: [], disclaimer: "", fallbackMessage: "" },
+    settings: DEFAULT_SETTINGS,
+    adminUsers: [{ id: "adm-01", username: "admin", passwordHash: "$2a$10$n4j7tLhF0YQhWvM5Z0vBTeNn5qQo3l3gK0YgK9u7WnL6U2f3C6Qh6", name: "Admin SiTeknik" }],
+  };
+  memoryDb = defaults;
+  return defaults;
 }
 
+/**
+ * refreshDbFromSupabase() — call at the top of each API route handler.
+ * Loads fresh data from Supabase and updates the in-process cache.
+ * Falls back gracefully to existing file/memory data if Supabase is unavailable.
+ */
+export async function refreshDbFromSupabase(): Promise<DatabaseSchema> {
+  if (isSupabaseConfigured()) {
+    const fresh = await loadFromSupabase();
+    if (fresh) {
+      supabaseCache = fresh;
+      supabaseCacheAt = Date.now();
+      memoryDb = fresh; // keep file cache in sync
+      return fresh;
+    }
+  }
+  return getDb();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public API: saveDb() — persists to Supabase + file
+// ─────────────────────────────────────────────────────────────────────────────
 export function saveDb(data: DatabaseSchema): void {
   memoryDb = data;
-  const writableDbPath = getDbFilePath();
+  supabaseCache = data;
+  supabaseCacheAt = Date.now();
+  saveToFile(data);
+  // Kick off async Supabase writes (non-blocking)
+  saveDbToSupabaseAsync(data);
+}
 
+async function saveDbToSupabaseAsync(data: DatabaseSchema): Promise<void> {
+  if (!isSupabaseConfigured()) return;
   try {
-    const dir = path.dirname(writableDbPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    const tempPath = `${writableDbPath}.tmp`;
-    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
-    fs.renameSync(tempPath, writableDbPath);
+    await Promise.all([
+      saveSettingsToSupabase(data.settings),
+      data.adminUsers.length > 0 ? saveAdminUserToSupabase(data.adminUsers[0]) : Promise.resolve(),
+    ]);
   } catch (err) {
-    console.warn("Could not persist file to disk, state maintained in memory:", err);
+    console.warn("[db] Supabase async save error:", err);
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Granular Supabase save helpers (exported for direct API route use)
+// ─────────────────────────────────────────────────────────────────────────────
+export {
+  saveSettingsToSupabase,
+  saveAdminUserToSupabase,
+  saveServicesToSupabase,
+  savePricingToSupabase,
+  savePricingDeleteToSupabase,
+  saveGalleryToSupabase,
+  saveGalleryDeleteToSupabase,
+  saveKnowledgeToSupabase,
+  saveKnowledgeDeleteToSupabase,
+  saveWarrantiesToSupabase,
+  saveChatbotConfigToSupabase,
+  refreshDbFromSupabase as loadFromSupabaseExport,
+};

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { refreshDbFromSupabase } from "@/lib/db";
 import { CalculationResult } from "@/lib/types";
 import { generateBookingWaUrl } from "@/lib/whatsapp";
 
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { category, params, location, notes } = body;
 
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
     const pricingMap = new Map(db.pricing.map((p) => [p.code, p]));
 
     const breakdown: CalculationResult["breakdown"] = [];

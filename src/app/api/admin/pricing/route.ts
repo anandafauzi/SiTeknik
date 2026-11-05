@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db";
+import { refreshDbFromSupabase, saveDb, savePricingToSupabase, savePricingDeleteToSupabase } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { PricingItem } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
   return NextResponse.json({ pricing: db.pricing });
 }
 
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body: PricingItem = await req.json();
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
 
     if (!body.name || !body.category || body.basePrice === undefined) {
       return NextResponse.json({ error: "Nama, kategori, dan harga wajib diisi" }, { status: 400 });
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
       code: body.code || `CUSTOM_${Date.now()}`,
     };
 
+    await savePricingToSupabase([newItem]);
     db.pricing.push(newItem);
     saveDb(db);
 
@@ -44,7 +47,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body: PricingItem = await req.json();
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
 
     const idx = db.pricing.findIndex((p) => p.id === body.id);
     if (idx === -1) {
@@ -52,6 +55,7 @@ export async function PUT(req: NextRequest) {
     }
 
     db.pricing[idx] = { ...db.pricing[idx], ...body };
+    await savePricingToSupabase([db.pricing[idx]]);
     saveDb(db);
 
     return NextResponse.json({ success: true, item: db.pricing[idx] });
@@ -68,10 +72,10 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "ID wajib disertakan" }, { status: 400 });
 
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
+  await savePricingDeleteToSupabase(id);
   db.pricing = db.pricing.filter((p) => p.id !== id);
   saveDb(db);
 
   return NextResponse.json({ success: true });
 }
-

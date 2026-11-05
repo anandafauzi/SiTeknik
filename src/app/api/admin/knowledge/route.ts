@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db";
+import { refreshDbFromSupabase, saveDb, saveKnowledgeToSupabase, saveKnowledgeDeleteToSupabase, saveChatbotConfigToSupabase } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { KnowledgeItem, ChatbotConfig } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = getDb();
-  return NextResponse.json({
-    knowledge: db.knowledge,
-    chatbotConfig: db.chatbotConfig,
-  });
+  const db = await refreshDbFromSupabase();
+  return NextResponse.json({ knowledge: db.knowledge, chatbotConfig: db.chatbotConfig });
 }
 
 export async function POST(req: NextRequest) {
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body: KnowledgeItem = await req.json();
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
 
     if (!body.topic || !body.content) {
       return NextResponse.json({ error: "Topik dan isi informasi wajib diisi" }, { status: 400 });
@@ -32,6 +31,7 @@ export async function POST(req: NextRequest) {
       keywords: body.keywords && body.keywords.length > 0 ? body.keywords : body.topic.toLowerCase().split(" "),
     };
 
+    await saveKnowledgeToSupabase([newItem]);
     db.knowledge.push(newItem);
     saveDb(db);
 
@@ -47,16 +47,18 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
 
-    // Check if it's updating ChatbotConfig or KnowledgeItem
+    // Update ChatbotConfig
     if (body.type === "config") {
       const config: ChatbotConfig = body.config;
       db.chatbotConfig = { ...db.chatbotConfig, ...config };
+      await saveChatbotConfigToSupabase(db.chatbotConfig);
       saveDb(db);
       return NextResponse.json({ success: true, chatbotConfig: db.chatbotConfig });
     }
 
+    // Update KnowledgeItem
     const item: KnowledgeItem = body;
     const idx = db.knowledge.findIndex((k) => k.id === item.id);
     if (idx === -1) {
@@ -64,6 +66,7 @@ export async function PUT(req: NextRequest) {
     }
 
     db.knowledge[idx] = { ...db.knowledge[idx], ...item };
+    await saveKnowledgeToSupabase([db.knowledge[idx]]);
     saveDb(db);
 
     return NextResponse.json({ success: true, item: db.knowledge[idx] });
@@ -80,10 +83,10 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "ID wajib disertakan" }, { status: 400 });
 
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
+  await saveKnowledgeDeleteToSupabase(id);
   db.knowledge = db.knowledge.filter((k) => k.id !== id);
   saveDb(db);
 
   return NextResponse.json({ success: true });
 }
-

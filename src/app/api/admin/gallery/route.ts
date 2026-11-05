@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, saveDb } from "@/lib/db";
+import { refreshDbFromSupabase, saveDb, saveGalleryToSupabase, saveGalleryDeleteToSupabase } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { GalleryItem } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
   return NextResponse.json({ gallery: db.gallery });
 }
 
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body: GalleryItem = await req.json();
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
 
     if (!body.title || !body.category || !body.imageUrl) {
       return NextResponse.json({ error: "Judul, kategori, dan foto wajib diisi" }, { status: 400 });
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
       date: body.date || new Date().toISOString().split("T")[0],
     };
 
+    await saveGalleryToSupabase([newItem]);
     db.gallery.unshift(newItem);
     saveDb(db);
 
@@ -44,7 +47,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body: GalleryItem = await req.json();
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
 
     const idx = db.gallery.findIndex((g) => g.id === body.id);
     if (idx === -1) {
@@ -52,6 +55,7 @@ export async function PUT(req: NextRequest) {
     }
 
     db.gallery[idx] = { ...db.gallery[idx], ...body };
+    await saveGalleryToSupabase([db.gallery[idx]]);
     saveDb(db);
 
     return NextResponse.json({ success: true, item: db.gallery[idx] });
@@ -68,10 +72,10 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "ID wajib disertakan" }, { status: 400 });
 
-  const db = getDb();
+  const db = await refreshDbFromSupabase();
+  await saveGalleryDeleteToSupabase(id);
   db.gallery = db.gallery.filter((g) => g.id !== id);
   saveDb(db);
 
   return NextResponse.json({ success: true });
 }
-
