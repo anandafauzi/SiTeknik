@@ -14,6 +14,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Jasa Cuci AC & Pasang AC Tangerang Selatan Bergaransi — SiTeknik",
   description:

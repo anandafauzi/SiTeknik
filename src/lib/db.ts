@@ -418,43 +418,72 @@ const defaultAdminUsers = [
   },
 ];
 
+let memoryDb: DatabaseSchema | null = null;
+
+function getDbFilePath(): string {
+  // On Vercel serverless functions, /tmp is the only writable directory
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join("/tmp", "siteknik_db.json");
+  }
+  return path.join(process.cwd(), "data", "siteknik_db.json");
+}
+
 function ensureDbFile(): DatabaseSchema {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (memoryDb) {
+    return memoryDb;
   }
 
-  if (!fs.existsSync(DB_PATH)) {
-    const initialData: DatabaseSchema = {
-      services: defaultServices,
-      pricing: defaultPricing,
-      gallery: defaultGallery,
-      warranties: defaultWarranties,
-      knowledge: defaultKnowledge,
-      chatbotConfig: defaultChatbotConfig,
-      settings: defaultSettings,
-      adminUsers: defaultAdminUsers,
-    };
-    fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2), "utf-8");
-    return initialData;
-  }
+  const defaultData: DatabaseSchema = {
+    services: defaultServices,
+    pricing: defaultPricing,
+    gallery: defaultGallery,
+    warranties: defaultWarranties,
+    knowledge: defaultKnowledge,
+    chatbotConfig: defaultChatbotConfig,
+    settings: defaultSettings,
+    adminUsers: defaultAdminUsers,
+  };
 
+  const projectDbPath = path.join(process.cwd(), "data", "siteknik_db.json");
+  const writableDbPath = getDbFilePath();
+
+  // 1. Try reading from writable path (/tmp on Vercel) if already created
   try {
-    const content = fs.readFileSync(DB_PATH, "utf-8");
-    return JSON.parse(content);
+    if (fs.existsSync(writableDbPath)) {
+      const content = fs.readFileSync(writableDbPath, "utf-8");
+      memoryDb = JSON.parse(content);
+      return memoryDb!;
+    }
   } catch (err) {
-    console.error("Error reading database file, fallback to defaults", err);
-    return {
-      services: defaultServices,
-      pricing: defaultPricing,
-      gallery: defaultGallery,
-      warranties: defaultWarranties,
-      knowledge: defaultKnowledge,
-      chatbotConfig: defaultChatbotConfig,
-      settings: defaultSettings,
-      adminUsers: defaultAdminUsers,
-    };
+    // ignore
   }
+
+  // 2. Try reading from bundled project file
+  try {
+    if (fs.existsSync(projectDbPath)) {
+      const content = fs.readFileSync(projectDbPath, "utf-8");
+      memoryDb = JSON.parse(content);
+      return memoryDb!;
+    }
+  } catch (err) {
+    // ignore
+  }
+
+  // 3. Fallback to default in-memory schema
+  memoryDb = defaultData;
+
+  // Attempt to write initial file if filesystem permits
+  try {
+    const dir = path.dirname(writableDbPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(writableDbPath, JSON.stringify(defaultData, null, 2), "utf-8");
+  } catch (err) {
+    // Read-only environment: keep in memory without throwing
+  }
+
+  return memoryDb;
 }
 
 export function getDb(): DatabaseSchema {
@@ -462,12 +491,19 @@ export function getDb(): DatabaseSchema {
 }
 
 export function saveDb(data: DatabaseSchema): void {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  memoryDb = data;
+  const writableDbPath = getDbFilePath();
+
+  try {
+    const dir = path.dirname(writableDbPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const tempPath = `${writableDbPath}.tmp`;
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
+    fs.renameSync(tempPath, writableDbPath);
+  } catch (err) {
+    console.warn("Could not persist file to disk, state maintained in memory:", err);
   }
-  const tempPath = `${DB_PATH}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
-  fs.renameSync(tempPath, DB_PATH);
 }
 

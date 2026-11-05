@@ -10,6 +10,8 @@ import CalculatorContainer from "@/components/calculator/CalculatorContainer";
 import Link from "next/link";
 import { Calculator, ArrowRight, ShieldAlert, PhoneCall } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "SiTeknik Tangerang Selatan — Jasa Instalasi Listrik, AC & Bor Sumur Bergaransi",
   description:

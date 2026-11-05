@@ -14,6 +14,8 @@ import {
   Layers,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Jasa Bor Sumur Tangerang Selatan (Jet Pump & Submersible) — SiTeknik",
   description:

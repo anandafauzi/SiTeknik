@@ -3,6 +3,8 @@ import { getDb } from "@/lib/db";
 import CalculatorContainer from "@/components/calculator/CalculatorContainer";
 import { Calculator, ShieldCheck, HelpCircle } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Kalkulator Prakiraan Biaya Layanan Teknik Tangerang Selatan — SiTeknik",
   description:

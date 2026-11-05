@@ -3,6 +3,8 @@ import { getDb } from "@/lib/db";
 import GalleryGrid from "@/components/gallery/GalleryGrid";
 import { Camera, ShieldCheck, MapPin } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Galeri Dokumentasi Pekerjaan Asli di Tangerang Selatan — SiTeknik",
   description:

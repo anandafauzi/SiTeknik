@@ -3,6 +3,8 @@ import { getDb } from "@/lib/db";
 import { askBusinessChatbot } from "@/lib/rag";
 import { generateBookingWaUrl } from "@/lib/whatsapp";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const db = getDb();
   return NextResponse.json({

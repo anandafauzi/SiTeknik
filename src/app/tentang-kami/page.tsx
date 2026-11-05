@@ -13,6 +13,8 @@ import {
   Droplet,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Tentang Kami & Ketentuan Garansi Resmi — SiTeknik Tangerang Selatan",
   description:

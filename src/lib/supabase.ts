@@ -10,3 +10,4 @@ export const supabase = supabaseAnonKey
 export function isSupabaseConfigured(): boolean {
   return Boolean(supabaseUrl && supabaseAnonKey);
 }
+

@@ -14,6 +14,8 @@ import {
   Calculator,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Jasa Instalasi Listrik Tangerang Selatan Bergaransi — SiTeknik",
   description:
