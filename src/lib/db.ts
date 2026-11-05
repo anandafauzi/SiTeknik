@@ -189,7 +189,7 @@ async function loadFromSupabase(): Promise<DatabaseSchema | null> {
 async function saveSettingsToSupabase(settings: SiteSettings): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
-  await sb.from("site_settings").upsert({
+  const { error } = await sb.from("site_settings").upsert({
     id: 1,
     business_name: settings.businessName,
     tagline: settings.tagline,
@@ -204,17 +204,25 @@ async function saveSettingsToSupabase(settings: SiteSettings): Promise<void> {
     service_areas: settings.serviceAreas,
     gemini_api_key: settings.geminiApiKey || "",
   });
+  if (error) {
+    console.error("[db] saveSettingsToSupabase error:", error);
+    throw new Error(error.message);
+  }
 }
 
 async function saveAdminUserToSupabase(user: { id: string; username: string; passwordHash: string; name: string }): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
-  await sb.from("admin_users").upsert({
+  const { error } = await sb.from("admin_users").upsert({
     id: user.id,
     username: user.username,
     password_hash: user.passwordHash,
     name: user.name,
   });
+  if (error) {
+    console.error("[db] saveAdminUserToSupabase error:", error);
+    throw new Error(error.message);
+  }
 }
 
 async function saveServicesToSupabase(services: ServiceItem[]): Promise<void> {
