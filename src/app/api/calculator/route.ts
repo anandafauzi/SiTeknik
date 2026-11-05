@@ -86,65 +86,53 @@ export async function POST(req: NextRequest) {
       const {
         serviceType = "cuci", // 'cuci', 'pasang', 'bongkar-pasang'
         capacity = "1pk", // '0.5pk', '1pk', '1.5pk', '2pk'
-        units = 1,
+        units = 0,
         includeFreon = false,
         extraPiping = 0,
       } = params || {};
 
       const isLargeUnit = capacity === "1.5pk" || capacity === "2pk";
+      const unitCount = Math.max(0, Number(units) || 0);
 
-      if (serviceType === "cuci") {
-        const itemCode = isLargeUnit ? "AC_CUCI_15_20" : "AC_CUCI_05_10";
-        const pricing = pricingMap.get(itemCode);
-        if (pricing) {
-          breakdown.push({
-            item: `${pricing.name} (${capacity.toUpperCase()})`,
-            qty: Number(units),
-            unit: pricing.unit,
-            price: pricing.basePrice,
-            subtotal: Number(units) * pricing.basePrice,
-          });
+      if (unitCount > 0) {
+        let itemCode = "";
+        if (serviceType === "cuci") {
+          itemCode = isLargeUnit ? "AC_CUCI_15_20" : "AC_CUCI_05_10";
+        } else if (serviceType === "pasang") {
+          itemCode = isLargeUnit ? "AC_PASANG_15_20" : "AC_PASANG_05_10";
+        } else if (serviceType === "bongkar-pasang") {
+          itemCode = "AC_BONGKAR_PASANG";
         }
-      } else if (serviceType === "pasang") {
-        const itemCode = isLargeUnit ? "AC_PASANG_15_20" : "AC_PASANG_05_10";
-        const pricing = pricingMap.get(itemCode);
-        if (pricing) {
-          breakdown.push({
-            item: `${pricing.name} (${capacity.toUpperCase()})`,
-            qty: Number(units),
-            unit: pricing.unit,
-            price: pricing.basePrice,
-            subtotal: Number(units) * pricing.basePrice,
-          });
+
+        if (itemCode) {
+          const pricing = pricingMap.get(itemCode);
+          if (pricing) {
+            breakdown.push({
+              item: `${pricing.name} (${capacity.toUpperCase()})`,
+              qty: unitCount,
+              unit: pricing.unit,
+              price: pricing.basePrice,
+              subtotal: unitCount * pricing.basePrice,
+            });
+          }
         }
-      } else if (serviceType === "bongkar-pasang") {
-        const pricing = pricingMap.get("AC_BONGKAR_PASANG");
-        if (pricing) {
-          breakdown.push({
-            item: `${pricing.name} (${capacity.toUpperCase()})`,
-            qty: Number(units),
-            unit: pricing.unit,
-            price: pricing.basePrice,
-            subtotal: Number(units) * pricing.basePrice,
-          });
+
+        if (includeFreon) {
+          const freonPricing = pricingMap.get("AC_TAMBAH_FREON_R32");
+          if (freonPricing) {
+            additionalFees.push({
+              item: `${freonPricing.name} (${unitCount} unit)`,
+              price: freonPricing.basePrice * unitCount,
+            });
+          }
         }
       }
 
-      if (includeFreon) {
-        const freonPricing = pricingMap.get("AC_TAMBAH_FREON_R32");
-        if (freonPricing) {
-          additionalFees.push({
-            item: `${freonPricing.name} (${units} unit)`,
-            price: freonPricing.basePrice * Number(units),
-          });
-        }
-      }
-
-      if (extraPiping > 0) {
+      if (Number(extraPiping) > 0) {
         const pipePricing = pricingMap.get("AC_PIPA_TEMBAGA");
         if (pipePricing) {
           additionalFees.push({
-            item: `${pipePricing.name} (${extraPiping} m)`,
+            item: `${pipePricing.name} (${Number(extraPiping)} m)`,
             price: pipePricing.basePrice * Number(extraPiping),
           });
         }
@@ -152,25 +140,28 @@ export async function POST(req: NextRequest) {
     } else if (category === "bor-sumur") {
       jobTitle = "Estimasi Pengeboran Sumur";
       const {
-        depthTier = "20-30", // '20-30', '30-45', '50-60'
+        depthTier = "", // '20-30', '30-45', '50-60'
         pumpType = "none", // 'none', 'jetpump', 'submersible'
         pipeDistance = 0,
         includeKuras = false,
       } = params || {};
 
-      let depthCode = "SM_BOR_20_30M";
-      if (depthTier === "30-45") depthCode = "SM_BOR_30_45M";
-      if (depthTier === "50-60") depthCode = "SM_BOR_50_60M";
+      let depthCode = "";
+      if (depthTier === "20-30") depthCode = "SM_BOR_20_30M";
+      else if (depthTier === "30-45") depthCode = "SM_BOR_30_45M";
+      else if (depthTier === "50-60") depthCode = "SM_BOR_50_60M";
 
-      const depthPricing = pricingMap.get(depthCode);
-      if (depthPricing) {
-        breakdown.push({
-          item: depthPricing.name,
-          qty: 1,
-          unit: depthPricing.unit,
-          price: depthPricing.basePrice,
-          subtotal: depthPricing.basePrice,
-        });
+      if (depthCode) {
+        const depthPricing = pricingMap.get(depthCode);
+        if (depthPricing) {
+          breakdown.push({
+            item: depthPricing.name,
+            qty: 1,
+            unit: depthPricing.unit,
+            price: depthPricing.basePrice,
+            subtotal: depthPricing.basePrice,
+          });
+        }
       }
 
       if (pumpType === "jetpump") {
