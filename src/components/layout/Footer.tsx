@@ -213,13 +213,6 @@ export default function Footer({ settings }: FooterProps) {
             <Link href="/kontak" className="hover:text-white transition-colors">
               Kontak
             </Link>
-            <Link
-              href="/admin/login"
-              className="flex items-center gap-1 text-slate-400 hover:text-brand-accent transition-colors"
-            >
-              <Lock className="w-3 h-3" />
-              <span>Admin Login</span>
-            </Link>
           </div>
         </div>
       </div>
