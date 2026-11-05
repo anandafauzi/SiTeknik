@@ -23,18 +23,20 @@ export function verifyToken(token: string): TokenPayload | null {
   }
 }
 
+// Known default hash for 'admin123' — only valid if hash hasn't been changed from default
+const DEFAULT_ADMIN_HASH = "$2a$10$n4j7tLhF0YQhWvM5Z0vBTeNn5qQo3l3gK0YgK9u7WnL6U2f3C6Qh6";
+
 export async function comparePassword(plain: string, hash: string): Promise<boolean> {
   try {
-    // If user entered admin123 and hash is demo hash, allow
-    if (plain === "admin123") return true;
-
     if (hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$")) {
-      const match = await bcrypt.compare(plain, hash);
-      if (match) return true;
+      // For the default hash, also allow plaintext fallback comparison so first-time login works
+      if (hash === DEFAULT_ADMIN_HASH && plain === "admin123") return true;
+      return await bcrypt.compare(plain, hash);
     }
+    // Plain-text hash fallback (legacy)
     return plain === hash;
   } catch (err) {
-    return plain === "admin123";
+    return false;
   }
 }
 

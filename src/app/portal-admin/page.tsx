@@ -157,11 +157,10 @@ export default function PortalAdminPage() {
           {/* Footer Card Info */}
           <div className="mt-8 pt-5 border-t border-slate-100 text-center space-y-1">
             <p className="text-[11px] text-slate-500">
-              Kredensial Default: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800 font-bold">admin</code> /{" "}
-              <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800 font-bold">admin123</code>
+              Halaman ini bersifat privat dan hanya dapat diakses oleh pengelola resmi.
             </p>
             <p className="text-[10px] text-slate-400">
-              Halaman ini bersifat privat dan terenkripsi sesi JWT 7 hari.
+              Sesi terenkripsi JWT • Akses 7 hari
             </p>
           </div>
         </div>
@@ -169,3 +168,4 @@ export default function PortalAdminPage() {
     </div>
   );
 }
+

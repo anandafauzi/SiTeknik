@@ -37,6 +37,7 @@ export default function ChatbotWidget() {
   const [greeting, setGreeting] = useState(
     "Halo! Saya Asisten Virtual SiTeknik. Ada yang bisa saya bantu seputar jasa listrik, AC, atau bor sumur di Tangerang Selatan?"
   );
+  const [whatsappNumber, setWhatsappNumber] = useState("6281234567890");
   const [hasInitialized, setHasInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +51,9 @@ export default function ChatbotWidget() {
           if (data.config?.greeting) setGreeting(data.config.greeting);
           if (data.config?.quickQuestions?.length) {
             setQuickQuestions(data.config.quickQuestions);
+          }
+          if (data.settings?.whatsappNumber) {
+            setWhatsappNumber(data.settings.whatsappNumber);
           }
         }
       } catch (err) {
@@ -163,7 +167,7 @@ export default function ChatbotWidget() {
     const shortSummary = lastBotReply.slice(0, 200).replace(/\n/g, " ");
 
     const text = `Halo Admin, saya ingin berkonsultasi mengenai layanan.\n\nJenis Layanan: Teknik & Perawatan Rumah\nKebutuhan: ${lastUserQuery}\nLokasi: Tangerang Selatan\nInformasi yang sudah diperoleh dari chatbot: ${shortSummary}...\n\nMohon informasi lebih lanjut. Terima kasih.`;
-    return `https://wa.me/6281234567890?text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`;
   };
 
   return (

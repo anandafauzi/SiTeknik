@@ -17,11 +17,35 @@ export default function ContactPage() {
   const [service, setService] = useState("Instalasi Listrik");
   const [location, setLocation] = useState("Serpong");
   const [message, setMessage] = useState("");
+  const [phone, setPhone] = useState("6281234567890");
+  const [displayPhone, setDisplayPhone] = useState("0812-3456-7890");
+  const [address, setAddress] = useState("Jl. Raya Serpong No. 88, Tangerang Selatan, Banten 15310");
+  const [operatingHours, setOperatingHours] = useState("Senin - Minggu: 07.30 - 20.00 WIB");
+  const [email, setEmail] = useState("layanan@siteknik.com");
+
+  React.useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/services");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.whatsappNumber) setPhone(data.settings.whatsappNumber);
+          if (data.settings?.phoneDisplay) setDisplayPhone(data.settings.phoneDisplay);
+          if (data.settings?.address) setAddress(data.settings.address);
+          if (data.settings?.operatingHours) setOperatingHours(data.settings.operatingHours);
+          if (data.settings?.email) setEmail(data.settings.email);
+        }
+      } catch (err) {
+        // fallback to defaults
+      }
+    }
+    loadSettings();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const text = `Halo Admin SiTeknik, saya ingin memesan layanan teknisi.\n\nNama: ${name || "[Pelanggan]"}\nJenis Layanan: ${service}\nLokasi: Kecamatan ${location}, Tangerang Selatan\nDetail Kebutuhan: ${message || "Mohon informasi ketersediaan jadwal teknisi."}\n\nTerima kasih.`;
-    window.open(`https://wa.me/6281234567890?text=${encodeURIComponent(text)}`, "_blank");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   return (
@@ -69,7 +93,7 @@ export default function ContactPage() {
                 <div>
                   <h4 className="font-bold text-navy-900 text-sm">Alamat Operasional</h4>
                   <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-                    Jl. Raya Serpong No. 88, Tangerang Selatan, Banten 15310
+                    {address}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     (Posko teknisi tersebar di Pamulang, Ciputat, BSD, dan Bintaro)
@@ -84,12 +108,12 @@ export default function ContactPage() {
                 <div>
                   <h4 className="font-bold text-navy-900 text-sm">WhatsApp & Telepon Admin</h4>
                   <a
-                    href="https://wa.me/6281234567890"
+                    href={`https://wa.me/${phone}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs font-semibold text-emerald-600 hover:underline mt-1 block"
                   >
-                    0812-3456-7890 (Klik untuk Chat)
+                    {displayPhone} (Klik untuk Chat)
                   </a>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Respon cepat: Rata-rata 5 - 15 menit
@@ -104,7 +128,7 @@ export default function ContactPage() {
                 <div>
                   <h4 className="font-bold text-navy-900 text-sm">Jam Operasional Panggilan</h4>
                   <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-                    Senin - Minggu: 07.30 - 20.00 WIB
+                    {operatingHours}
                   </p>
                   <p className="text-[11px] text-emerald-600 font-medium mt-0.5">
                     *Tersedia teknisi siaga darurat (korsleting/pompa mati total)
@@ -119,7 +143,7 @@ export default function ContactPage() {
                 <div>
                   <h4 className="font-bold text-navy-900 text-sm">Email Resmi</h4>
                   <p className="text-slate-600 text-xs mt-1">
-                    layanan@siteknik.com
+                    {email}
                   </p>
                 </div>
               </div>

@@ -12,9 +12,11 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-100">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto min-h-screen p-4 sm:p-8">
+      {/* On mobile: add top padding for the sticky mobile header (56px).
+          On md+: add left margin for the fixed 256px (w-64) sidebar. */}
+      <main className="pt-14 md:pt-0 md:ml-64 min-h-screen p-4 sm:p-8 overflow-y-auto">
         {children}
       </main>
     </div>

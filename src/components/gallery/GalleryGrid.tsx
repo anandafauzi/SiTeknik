@@ -7,9 +7,13 @@ import { MapPin, Calendar, ZoomIn, Eye, Sparkles, Filter, X } from "lucide-react
 
 interface GalleryGridProps {
   initialItems: GalleryItem[];
+  whatsappNumber?: string;
 }
 
-export default function GalleryGrid({ initialItems }: GalleryGridProps) {
+export default function GalleryGrid({
+  initialItems,
+  whatsappNumber = "6281234567890",
+}: GalleryGridProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [activeModalItem, setActiveModalItem] = useState<GalleryItem | null>(null);
   const [activeCompareMode, setActiveCompareMode] = useState<"after" | "before">("after");
@@ -209,7 +213,7 @@ export default function GalleryGrid({ initialItems }: GalleryGridProps) {
                 Tertarik dengan pekerjaan serupa untuk rumah Anda?
               </span>
               <a
-                href={`https://wa.me/6281234567890?text=${encodeURIComponent(
+                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
                   `Halo Admin SiTeknik, saya melihat dokumentasi "${activeModalItem.title}" di ${activeModalItem.location}. Saya ingin menanyakan layanan yang sama untuk rumah saya.`
                 )}`}
                 target="_blank"

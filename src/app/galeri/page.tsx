@@ -37,7 +37,10 @@ export default function GalleryPage() {
 
       {/* Grid Container */}
       <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <GalleryGrid initialItems={galleryItems} />
+        <GalleryGrid
+          initialItems={galleryItems}
+          whatsappNumber={db.settings.whatsappNumber}
+        />
       </section>
     </div>
   );

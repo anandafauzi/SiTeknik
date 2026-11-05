@@ -2,12 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { SiteSettings } from "@/lib/types";
-import { Settings, Save, Check, Phone, MapPin, Mail, Clock, Globe } from "lucide-react";
+import { Settings, Save, Check, Phone, MapPin, Mail, Clock, Globe, Lock, User } from "lucide-react";
 
 export default function AdminPengaturanPage() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
+  const [adminUsername, setAdminUsername] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
     fetchSettings();
@@ -19,6 +24,7 @@ export default function AdminPengaturanPage() {
       if (res.ok) {
         const data = await res.json();
         setSettings(data.settings);
+        if (data.adminUsername) setAdminUsername(data.adminUsername);
       }
     } catch (err) {
       console.error("Failed to load settings", err);
@@ -31,14 +37,34 @@ export default function AdminPengaturanPage() {
     e.preventDefault();
     if (!settings) return;
 
+    // Validate password if provided
+    setPasswordError("");
+    if (newPassword && newPassword !== confirmPassword) {
+      setPasswordError("Konfirmasi password tidak cocok.");
+      return;
+    }
+    if (newPassword && newPassword.length < 6) {
+      setPasswordError("Password baru minimal 6 karakter.");
+      return;
+    }
+
     try {
+      const payload: Record<string, unknown> = { ...settings };
+      if (newUsername.trim()) payload.newUsername = newUsername.trim();
+      if (newPassword.trim()) payload.newPassword = newPassword.trim();
+
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
+        const data = await res.json();
+        if (data.adminUsername) setAdminUsername(data.adminUsername);
+        setNewPassword("");
+        setConfirmPassword("");
+        setNewUsername("");
         setSuccessMsg("Pengaturan website berhasil diperbarui!");
         setTimeout(() => setSuccessMsg(""), 3000);
       }
@@ -243,6 +269,65 @@ export default function AdminPengaturanPage() {
               Area ini akan otomatis muncul pada dropdown kalkulator, footer, dan kartu jangkauan wilayah.
             </p>
           </div>
+        </div>
+
+        {/* Keamanan Akun */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-base font-bold text-navy-900 font-heading flex items-center gap-2 pb-3 border-b border-slate-100">
+            <Lock className="w-4 h-4 text-rose-500" />
+            <span>Keamanan Akun Admin</span>
+          </h2>
+          <p className="text-xs text-slate-500">
+            Username saat ini:{" "}
+            <span className="font-mono font-bold text-navy-900">{adminUsername || "admin"}</span>
+            {" "}— Kosongkan field di bawah jika tidak ingin mengubah password atau username.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" /> Username Admin Baru:
+              </label>
+              <input
+                type="text"
+                placeholder="Biarkan kosong jika tidak diubah"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" /> Password Baru:
+              </label>
+              <input
+                type="password"
+                placeholder="Min. 6 karakter"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Konfirmasi Password Baru:
+              </label>
+              <input
+                type="password"
+                placeholder="Ulangi password baru"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900"
+              />
+            </div>
+          </div>
+
+          {passwordError && (
+            <p className="text-xs text-rose-600 font-medium">{passwordError}</p>
+          )}
         </div>
 
         {/* Submit Bar */}
