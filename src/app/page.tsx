@@ -1,5 +1,5 @@
 import React from "react";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import HeroSection from "@/components/home/HeroSection";
 import AdvantagesSection from "@/components/home/AdvantagesSection";
 import ServicesSummary from "@/components/home/ServicesSummary";
@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Calculator, ArrowRight, ShieldAlert, PhoneCall } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata = {
   title: "SiTeknik Tangerang Selatan — Jasa Instalasi Listrik, AC & Bor Sumur Bergaransi",
@@ -18,8 +19,8 @@ export const metadata = {
     "Layanan panggilan teknisi rumah profesional di Tangerang Selatan: Instalasi listrik standar SNI, servis & cuci AC bersih, dan pengeboran sumur air bersih. Melayani Ciputat, Pamulang, Bintaro, BSD City, Serpong.",
 };
 
-export default function HomePage() {
-  const db = getDb();
+export default async function HomePage() {
+  const db = await getDbAsync();
   const settings = db.settings;
   const services = db.services;
 

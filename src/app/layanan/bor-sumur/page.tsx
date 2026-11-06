@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import {
   Droplet,
   ShieldCheck,
@@ -22,8 +22,8 @@ export const metadata = {
     "Jasa pengeboran sumur air bersih di Tangerang Selatan (Pamulang, Ciputat, BSD, Serpong). Berpengalaman memahami lapisan tanah Tangsel, garansi debit air 90 hari & pipa AW.",
 };
 
-export default function WellDrillingServicePage() {
-  const db = getDb();
+export default async function WellDrillingServicePage() {
+  const db = await getDbAsync();
   const service = db.services.find((s) => s.category === "bor-sumur") || db.services[2];
   const warranty = db.warranties.find((w) => w.serviceCategory === "bor-sumur");
   const whatsappNumber = db.settings.whatsappNumber;

@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import {
   Wind,
   ShieldCheck,
@@ -22,8 +22,8 @@ export const metadata = {
     "Jasa cuci AC bersih bertekanan tinggi, bongkar pasang AC split inverter & non-inverter, tambah freon R32/R410A, dan servis AC bocor air di Tangerang Selatan.",
 };
 
-export default function AcServicePage() {
-  const db = getDb();
+export default async function AcServicePage() {
+  const db = await getDbAsync();
   const service = db.services.find((s) => s.category === "ac") || db.services[1];
   const warranty = db.warranties.find((w) => w.serviceCategory === "ac");
   const whatsappNumber = db.settings.whatsappNumber;

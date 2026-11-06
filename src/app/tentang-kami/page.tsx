@@ -1,5 +1,5 @@
 import React from "react";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import {
   ShieldCheck,
   Award,
@@ -21,8 +21,8 @@ export const metadata = {
     "Profil usaha, standar keselamatan K3, profesionalitas teknisi, dan kebijakan garansi resmi SiTeknik untuk jasa listrik, AC, dan bor sumur di Tangerang Selatan.",
 };
 
-export default function AboutPage() {
-  const db = getDb();
+export default async function AboutPage() {
+  const db = await getDbAsync();
   const settings = db.settings;
   const warranties = db.warranties;
 

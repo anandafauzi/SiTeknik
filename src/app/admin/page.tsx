@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import {
   Wrench,
   DollarSign,
@@ -13,8 +13,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-export default function AdminDashboardPage() {
-  const db = getDb();
+export default async function AdminDashboardPage() {
+  const db = await getDbAsync();
 
   const stats = [
     {

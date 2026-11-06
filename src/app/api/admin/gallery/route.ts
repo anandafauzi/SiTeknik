@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { refreshDbFromSupabase, saveDb, saveGalleryToSupabase, saveGalleryDeleteToSupabase } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { GalleryItem } from "@/lib/types";
+import { revalidateAllPublicPages } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     await saveGalleryToSupabase([newItem]);
     db.gallery.unshift(newItem);
     saveDb(db);
+    revalidateAllPublicPages();
 
     return NextResponse.json({ success: true, item: newItem });
   } catch (err: any) {
@@ -57,6 +59,7 @@ export async function PUT(req: NextRequest) {
     db.gallery[idx] = { ...db.gallery[idx], ...body };
     await saveGalleryToSupabase([db.gallery[idx]]);
     saveDb(db);
+    revalidateAllPublicPages();
 
     return NextResponse.json({ success: true, item: db.gallery[idx] });
   } catch (err: any) {
@@ -72,10 +75,15 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "ID wajib disertakan" }, { status: 400 });
 
-  const db = await refreshDbFromSupabase();
-  await saveGalleryDeleteToSupabase(id);
-  db.gallery = db.gallery.filter((g) => g.id !== id);
-  saveDb(db);
+  try {
+    const db = await refreshDbFromSupabase();
+    await saveGalleryDeleteToSupabase(id);
+    db.gallery = db.gallery.filter((g) => g.id !== id);
+    saveDb(db);
+    revalidateAllPublicPages();
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }

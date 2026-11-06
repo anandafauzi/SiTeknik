@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import {
   Zap,
   ShieldCheck,
@@ -22,8 +22,8 @@ export const metadata = {
     "Jasa teknisi listrik panggilan terpercaya di Tangerang Selatan. Pasang titik lampu, stop kontak, MCB, penggantian kabel SNI, dan perbaikan korsleting bergaransi 30-90 hari.",
 };
 
-export default function ElectricityServicePage() {
-  const db = getDb();
+export default async function ElectricityServicePage() {
+  const db = await getDbAsync();
   const service = db.services.find((s) => s.category === "listrik") || db.services[0];
   const warranty = db.warranties.find((w) => w.serviceCategory === "listrik");
   const whatsappNumber = db.settings.whatsappNumber;

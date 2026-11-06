@@ -1,5 +1,5 @@
 import React from "react";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import CalculatorContainer from "@/components/calculator/CalculatorContainer";
 import { Calculator, ShieldCheck, HelpCircle } from "lucide-react";
 
@@ -11,8 +11,8 @@ export const metadata = {
     "Hitung simulasi dan estimasi biaya instalasi listrik, tarif cuci & pasang AC, serta biaya bor sumur di Tangerang Selatan secara transparan dan akurat.",
 };
 
-export default function CalculatorPage() {
-  const db = getDb();
+export default async function CalculatorPage() {
+  const db = await getDbAsync();
   const settings = db.settings;
 
   return (

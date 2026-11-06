@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import AppShell from "@/components/layout/AppShell";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function generateMetadata(): Promise<Metadata> {
-  const db = getDb();
+  const db = await getDbAsync();
   const settings = db.settings;
 
   return {
@@ -50,12 +53,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const db = getDb();
+  const db = await getDbAsync();
   const settings = db.settings;
 
   const jsonLd = {

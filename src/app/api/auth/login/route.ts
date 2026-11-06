@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { refreshDbFromSupabase } from "@/lib/db";
 import { comparePassword, signToken, COOKIE_NAME } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Username dan password wajib diisi." }, { status: 400 });
     }
 
-    const db = getDb();
+    const db = await refreshDbFromSupabase();
     const user = db.adminUsers.find((u) => u.username.toLowerCase() === username.toLowerCase());
 
     if (!user) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { refreshDbFromSupabase, saveDb, saveWarrantiesToSupabase } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { WarrantyPolicy } from "@/lib/types";
+import { revalidateAllPublicPages } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export async function PUT(req: NextRequest) {
 
     await saveWarrantiesToSupabase(db.warranties);
     saveDb(db);
+    revalidateAllPublicPages();
 
     return NextResponse.json({ success: true, policy: body });
   } catch (err: any) {

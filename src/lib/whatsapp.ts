@@ -11,13 +11,10 @@ export interface BookingDetails {
 }
 
 export function cleanPhoneNumber(phone: string): string {
-  // Strip non-numeric characters
   let clean = phone.replace(/\D/g, "");
-  // If starts with 08..., convert to 628...
   if (clean.startsWith("0")) {
     clean = "62" + clean.slice(1);
   }
-  // Default to 6281234567890 if empty
   return clean || "6281234567890";
 }
 
@@ -58,4 +55,3 @@ export function generateDirectConsultationWaUrl(customMessage?: string): string 
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(defaultMsg)}`;
 }
-

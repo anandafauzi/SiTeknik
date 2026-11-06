@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { refreshDbFromSupabase, saveDb, saveSettingsToSupabase, saveAdminUserToSupabase } from "@/lib/db";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { SiteSettings } from "@/lib/types";
+import { revalidateAllPublicPages } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export async function PUT(req: NextRequest) {
     db.settings = { ...db.settings, ...settingsData };
     await saveSettingsToSupabase(db.settings);
     saveDb(db); // update local cache
+    revalidateAllPublicPages();
 
     return NextResponse.json({
       success: true,

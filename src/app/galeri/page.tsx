@@ -1,5 +1,5 @@
 import React from "react";
-import { getDb } from "@/lib/db";
+import { getDbAsync } from "@/lib/db";
 import GalleryGrid from "@/components/gallery/GalleryGrid";
 import { Camera, ShieldCheck, MapPin } from "lucide-react";
 
@@ -11,8 +11,8 @@ export const metadata = {
     "Dokumentasi asli hasil pekerjaan teknisi SiTeknik: Instalasi listrik, panel MCB, cuci dan pemasangan AC, serta pengeboran sumur di BSD City, Bintaro, Pamulang, Ciputat, dan sekitarnya.",
 };
 
-export default function GalleryPage() {
-  const db = getDb();
+export default async function GalleryPage() {
+  const db = await getDbAsync();
   const galleryItems = db.gallery;
 
   return (

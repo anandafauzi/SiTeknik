@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getDb } from "./db";
+import { getDbAsync } from "./db";
 import { KnowledgeItem } from "./types";
 
 interface SearchResult {
@@ -7,8 +7,8 @@ interface SearchResult {
   score: number;
 }
 
-export function searchKnowledgeBase(query: string, limit = 4): KnowledgeItem[] {
-  const db = getDb();
+export async function searchKnowledgeBase(query: string, limit = 4): Promise<KnowledgeItem[]> {
+  const db = await getDbAsync();
   const lowerQuery = query.toLowerCase();
   const queryTokens = lowerQuery
     .replace(/[^\w\s]/g, " ")
@@ -48,8 +48,8 @@ export function searchKnowledgeBase(query: string, limit = 4): KnowledgeItem[] {
   return scored.filter((s) => s.score > 2).slice(0, limit).map((s) => s.item);
 }
 
-export function buildSystemPrompt(contextChunks: KnowledgeItem[]): string {
-  const db = getDb();
+export async function buildSystemPrompt(contextChunks: KnowledgeItem[]): Promise<string> {
+  const db = await getDbAsync();
   const settings = db.settings;
 
   const contextText = contextChunks.length > 0
@@ -82,9 +82,9 @@ ${contextText}
 }
 
 export async function askBusinessChatbot(userMessage: string, history: { role: "user" | "model"; text: string }[] = []) {
-  const db = getDb();
-  const relevantDocs = searchKnowledgeBase(userMessage, 4);
-  const systemPrompt = buildSystemPrompt(relevantDocs);
+  const db = await getDbAsync();
+  const relevantDocs = await searchKnowledgeBase(userMessage, 4);
+  const systemPrompt = await buildSystemPrompt(relevantDocs);
 
   // Check for API key (priority: settings > env)
   const apiKey = db.settings.geminiApiKey || process.env.GEMINI_API_KEY;
@@ -121,7 +121,7 @@ export async function askBusinessChatbot(userMessage: string, history: { role: "
   }
 
   // Smart Built-in Fallback RAG Engine (Zero failure mode)
-  const fallbackReply = generateSmartRagReply(userMessage, relevantDocs);
+  const fallbackReply = generateSmartRagReply(userMessage, relevantDocs, db.pricing);
   return {
     reply: fallbackReply,
     relevantDocs: relevantDocs.map((d) => d.topic),
@@ -129,15 +129,14 @@ export async function askBusinessChatbot(userMessage: string, history: { role: "
   };
 }
 
-function generateSmartRagReply(query: string, docs: KnowledgeItem[]): string {
-  const db = getDb();
+function generateSmartRagReply(query: string, docs: KnowledgeItem[], pricing: { code: string; basePrice: number }[]): string {
   const lower = query.toLowerCase();
 
   // Price inquiries
   if (lower.includes("harga") || lower.includes("biaya") || lower.includes("tarif") || lower.includes("berapa")) {
     if (lower.includes("cuci ac")) {
-      const p1 = db.pricing.find((p) => p.code === "AC_CUCI_05_10");
-      const p2 = db.pricing.find((p) => p.code === "AC_CUCI_15_20");
+      const p1 = pricing.find((p) => p.code === "AC_CUCI_05_10");
+      const p2 = pricing.find((p) => p.code === "AC_CUCI_15_20");
       return `Untuk jasa cuci AC di SiTeknik, biayanya adalah:\n• Kapasitas 0.5 PK - 1 PK: Rp${(p1?.basePrice || 75000).toLocaleString("id-ID")} per unit\n• Kapasitas 1.5 PK - 2 PK: Rp${(p2?.basePrice || 90000).toLocaleString("id-ID")} per unit\n\nPencucian mencakup pembersihan indoor, blower, filter, evaporator, dan outdoor unit dengan water jet bertekanan. Apakah Anda ingin menjadwalkan cuci AC sekarang melalui WhatsApp Admin?`;
     }
     if (lower.includes("pasang ac") || lower.includes("bongkar pasang")) {

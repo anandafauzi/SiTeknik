@@ -229,7 +229,7 @@ async function saveServicesToSupabase(services: ServiceItem[]): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
   for (const s of services) {
-    await sb.from("services").upsert({
+    const { error } = await sb.from("services").upsert({
       id: s.id, slug: s.slug, title: s.title, category: s.category,
       short_description: s.shortDescription, full_description: s.fullDescription,
       icon: s.icon, image: s.image, features: s.features, job_types: s.jobTypes,
@@ -237,6 +237,20 @@ async function saveServicesToSupabase(services: ServiceItem[]): Promise<void> {
       estimated_time: s.estimatedTime, starting_price: s.startingPrice,
       updated_at: new Date().toISOString(),
     });
+    if (error) {
+      console.error("[db] saveServicesToSupabase error:", error);
+      throw new Error(error.message);
+    }
+  }
+}
+
+async function saveServiceDeleteToSupabase(id: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  const { error } = await sb.from("services").delete().eq("id", id);
+  if (error) {
+    console.error("[db] saveServiceDeleteToSupabase error:", error);
+    throw new Error(error.message);
   }
 }
 
@@ -244,11 +258,15 @@ async function savePricingToSupabase(pricing: PricingItem[]): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
   for (const p of pricing) {
-    await sb.from("pricing").upsert({
+    const { error } = await sb.from("pricing").upsert({
       id: p.id, category: p.category, code: p.code, name: p.name,
       unit: p.unit, base_price: p.basePrice, description: p.description,
       is_addon: p.isAddon || false, updated_at: new Date().toISOString(),
     });
+    if (error) {
+      console.error("[db] savePricingToSupabase error:", error);
+      throw new Error(error.message);
+    }
   }
 }
 
@@ -256,66 +274,94 @@ async function saveGalleryToSupabase(gallery: GalleryItem[]): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
   for (const g of gallery) {
-    await sb.from("gallery").upsert({
+    const { error } = await sb.from("gallery").upsert({
       id: g.id, title: g.title, category: g.category, image_url: g.imageUrl,
       before_image_url: g.beforeImageUrl || null, after_image_url: g.afterImageUrl || null,
       job_type: g.jobType, location: g.location, date: g.date, description: g.description,
       updated_at: new Date().toISOString(),
     });
+    if (error) {
+      console.error("[db] saveGalleryToSupabase error:", error);
+      throw new Error(error.message);
+    }
   }
 }
 
 async function saveGalleryDeleteToSupabase(id: string): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
-  await sb.from("gallery").delete().eq("id", id);
+  const { error } = await sb.from("gallery").delete().eq("id", id);
+  if (error) {
+    console.error("[db] saveGalleryDeleteToSupabase error:", error);
+    throw new Error(error.message);
+  }
 }
 
 async function saveKnowledgeToSupabase(knowledge: KnowledgeItem[]): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
   for (const k of knowledge) {
-    await sb.from("knowledge").upsert({
+    const { error } = await sb.from("knowledge").upsert({
       id: k.id, category: k.category, topic: k.topic, content: k.content,
       keywords: k.keywords, updated_at: new Date().toISOString(),
     });
+    if (error) {
+      console.error("[db] saveKnowledgeToSupabase error:", error);
+      throw new Error(error.message);
+    }
   }
 }
 
 async function savePricingDeleteToSupabase(id: string): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
-  await sb.from("pricing").delete().eq("id", id);
+  const { error } = await sb.from("pricing").delete().eq("id", id);
+  if (error) {
+    console.error("[db] savePricingDeleteToSupabase error:", error);
+    throw new Error(error.message);
+  }
 }
 
 async function saveKnowledgeDeleteToSupabase(id: string): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
-  await sb.from("knowledge").delete().eq("id", id);
+  const { error } = await sb.from("knowledge").delete().eq("id", id);
+  if (error) {
+    console.error("[db] saveKnowledgeDeleteToSupabase error:", error);
+    throw new Error(error.message);
+  }
 }
 
 async function saveWarrantiesToSupabase(warranties: WarrantyPolicy[]): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
   for (const w of warranties) {
-    await sb.from("warranties").upsert({
+    const { error } = await sb.from("warranties").upsert({
       id: w.id, service_category: w.serviceCategory, title: w.title,
       duration: w.duration, coverage: w.coverage, claim_terms: w.claimTerms,
       exclusions: w.exclusions, updated_at: new Date().toISOString(),
     });
+    if (error) {
+      console.error("[db] saveWarrantiesToSupabase error:", error);
+      throw new Error(error.message);
+    }
   }
 }
 
 async function saveChatbotConfigToSupabase(config: ChatbotConfig): Promise<void> {
   const sb = getSupabaseAdmin();
   if (!sb) return;
-  await sb.from("chatbot_config").upsert({
+  const { error } = await sb.from("chatbot_config").upsert({
     id: 1,
     greeting: config.greeting,
     quick_questions: config.quickQuestions,
     disclaimer: config.disclaimer,
     fallback_message: config.fallbackMessage,
   });
+  if (error) {
+    console.error("[db] saveChatbotConfigToSupabase error:", error);
+    throw new Error(error.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -406,10 +452,22 @@ export function getDb(): DatabaseSchema {
 }
 
 /**
- * refreshDbFromSupabase() — call at the top of each API route handler.
- * Loads fresh data from Supabase and updates the in-process cache.
- * Falls back gracefully to existing file/memory data if Supabase is unavailable.
+ * getDbAsync() — asynchronous fetch for Server Components and API routes.
+ * Always returns fresh data from Supabase, with a 2-second in-memory dedup
+ * for sub-components rendering in the same request.
  */
+export async function getDbAsync(): Promise<DatabaseSchema> {
+  if (supabaseCache && Date.now() - supabaseCacheAt < 2000) {
+    return supabaseCache;
+  }
+  return refreshDbFromSupabase();
+}
+
+export function invalidateDbCache(): void {
+  supabaseCache = null;
+  supabaseCacheAt = 0;
+  memoryDb = null;
+}
 export async function refreshDbFromSupabase(): Promise<DatabaseSchema> {
   if (isSupabaseConfigured()) {
     const fresh = await loadFromSupabase();
@@ -454,6 +512,7 @@ export {
   saveSettingsToSupabase,
   saveAdminUserToSupabase,
   saveServicesToSupabase,
+  saveServiceDeleteToSupabase,
   savePricingToSupabase,
   savePricingDeleteToSupabase,
   saveGalleryToSupabase,
